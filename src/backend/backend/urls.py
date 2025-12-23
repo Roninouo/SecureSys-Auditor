@@ -5,6 +5,7 @@ URL Structure:
 - /admin/                   Django admin
 - /api/v1/                  Core API (legacy routes, being refactored)
 - /api/v1/auth/             Authentication endpoints
+- /api/v1/scanning/         Scanning endpoints (new modular app)
 - /api/v1/scans/.../report/ Report generation (new modular reports app)
 - /api/v1/webhooks/         Webhook management (new modular webhooks app)
 - /health/                  Health check endpoints (K8s compatible)
@@ -23,6 +24,9 @@ urlpatterns = [
     
     # API v1 - Core routes (legacy, being refactored)
     path('api/v1/', include('core.urls')),
+    
+    # API v1 - Scanning app (new decoupled architecture)
+    path('api/v1/scanning/', include('scanning.urls')),
     
     # API v1 - Modular apps
     path('api/v1/reports/', include('reports.urls')),

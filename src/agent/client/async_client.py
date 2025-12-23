@@ -67,23 +67,20 @@ class AsyncSecureSysClient(BaseAsyncClient):
         try:
             response = await self._request_with_retry(
                 'GET',
-                f'{self.api_url}/api/v1/systems/',
+                f'{self.api_url}/api/v1/scanning/systems/by_hostname/',
                 params={'hostname': hostname}
             )
             
             if response.status == 200:
                 data = json.loads(response._body)
-                if isinstance(data, list) and data:
-                    return data[0]
-                elif isinstance(data, dict) and data.get('results'):
-                    return data['results'][0]
+                return data
         except Exception:
             pass
         
         # Register new
         response = await self._request_with_retry(
             'POST',
-            f'{self.api_url}/api/v1/systems/',
+            f'{self.api_url}/api/v1/scanning/systems/',
             json={
                 'hostname': hostname,
                 'os': os,
@@ -125,7 +122,7 @@ class AsyncSecureSysClient(BaseAsyncClient):
         
         response = await self._request_with_retry(
             'POST',
-            f'{self.api_url}/api/v1/scans/submit/',
+            f'{self.api_url}/api/v1/scanning/scans/submit/',
             json=payload,
             headers={
                 'X-Signature': signature,
@@ -173,7 +170,7 @@ class AsyncSecureSysClient(BaseAsyncClient):
         """Get the status of a scan."""
         response = await self._request_with_retry(
             'GET',
-            f'{self.api_url}/api/v1/scans/{scan_id}/'
+            f'{self.api_url}/api/v1/scanning/scans/{scan_id}/'
         )
         
         if response.status == 200:
@@ -241,7 +238,7 @@ class AsyncSecureSysClient(BaseAsyncClient):
         
         response = await self._request_with_retry(
             'GET',
-            f'{self.api_url}/api/v1/findings/',
+            f'{self.api_url}/api/v1/scanning/findings/',
             params=params
         )
         

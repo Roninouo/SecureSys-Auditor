@@ -2,7 +2,8 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { 
   LayoutDashboard, 
-  Server, 
+  Server,
+  Scan, 
   FileText, 
   Settings, 
   LogOut,
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Systems', href: '/systems', icon: Server },
+  { name: 'Scans', href: '/scans', icon: Scan },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]

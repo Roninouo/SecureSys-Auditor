@@ -3,12 +3,13 @@
 SecureSys Agent - CLI Entry Point
 
 Usage:
-    securesys-agent scan [--output json|yaml] [--submit]
+    securesys-agent scan [--output json|yaml] [--submit] [--async]
     securesys-agent register --api-url <url> --api-key <key>
     securesys-agent --version
     securesys-agent --help
 """
 
+import asyncio
 import click
 import json
 import sys
@@ -18,6 +19,71 @@ from pathlib import Path
 from .scanner import SystemScanner
 from .config import Config, load_config, save_config
 from .api_client import SecureSysAPIClient
+from .client.async_client import AsyncSecureSysClient
+from .client.base import ScanType
+
+
+async def _submit_scan_async(config, scan_result, scan_type, wait, verbose):
+    """
+    Submit scan using async client.
+    
+    Args:
+        config: Agent configuration
+        scan_result: Scan data from SystemScanner
+        scan_type: Type of scan (ScanType enum)
+        wait: Whether to wait for completion
+        verbose: Enable verbose output
+    
+    Returns:
+        Scan result dict
+    """
+    async with AsyncSecureSysClient(
+        api_url=config.api_url,
+        api_key=config.api_key,
+        allow_insecure_localhost=config.allow_insecure_localhost
+    ) as client:
+        # Health check
+        if not await client.health_check():
+            raise Exception("API is not accessible")
+        
+        # Register system
+        system = await client.register_or_get_system(
+            hostname=scan_result['hostname'],
+            os=f"{scan_result['os']['name']} {scan_result['os']['version']}",
+            environment='production'
+        )
+        
+        if verbose:
+            click.echo(f'   System ID: {system["id"]}')
+        
+        # Submit scan
+        result = await client.submit_scan(
+            system_id=system['id'],
+            scan_payload=scan_result,
+            scan_type=scan_type
+        )
+        
+        click.echo(click.style(f'✓ Scan submitted successfully!', fg='green'))
+        click.echo(f'   Scan ID: {result["scan_id"]}')
+        click.echo(f'   Status: {result["status"]}')
+        
+        # Wait for completion if requested
+        if wait:
+            click.echo('   Waiting for processing...')
+            try:
+                final_result = await client.wait_for_scan_completion(
+                    scan_id=result['scan_id'],
+                    timeout=120.0
+                )
+                click.echo(click.style(f'   ✓ Processing complete!', fg='green'))
+                click.echo(f'   Risk Score: {final_result.get("risk_score", "N/A")}')
+                click.echo(f'   Maturity Level: {final_result.get("maturity_level", "N/A")}')
+                click.echo(f'   Findings: {final_result.get("findings_count", 0)}')
+                return final_result
+            except TimeoutError:
+                click.echo(click.style('   ⚠ Timeout waiting for completion', fg='yellow'))
+        
+        return result
 
 @click.group()
 @click.version_option(version='1.0.0', prog_name='securesys-agent')
@@ -32,11 +98,16 @@ def cli():
 @click.option('--submit', '-s', is_flag=True, help='Submit scan to API')
 @click.option('--file', '-f', type=click.Path(), help='Save output to file')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose output')
-def scan(output, submit, file, verbose):
+@click.option('--async', 'use_async', is_flag=True, help='Use async client for submission')
+@click.option('--scan-type', type=click.Choice(['full', 'quick', 'compliance', 'vulnerability']),
+              default='full', help='Type of scan to perform')
+@click.option('--wait', '-w', is_flag=True, help='Wait for scan processing to complete')
+def scan(output, submit, file, verbose, use_async, scan_type, wait):
     """Perform a security scan of the local system."""
     
     click.echo(click.style('🔍 SecureSys Agent - Starting Scan', fg='blue', bold=True))
     click.echo(f'   Timestamp: {datetime.now().isoformat()}')
+    click.echo(f'   Scan Type: {scan_type.capitalize()}')
     click.echo()
     
     # Initialize scanner
@@ -81,25 +152,35 @@ def scan(output, submit, file, verbose):
             click.echo(click.style('Error: API not configured. Run "securesys-agent register" first.', fg='red'))
             sys.exit(1)
         
-        client = SecureSysAPIClient(config.api_url, config.api_key)
+        # Convert scan_type string to ScanType enum
+        scan_type_enum = ScanType(scan_type)
         
-        try:
-            # First, ensure system is registered
-            system = client.register_or_get_system(
-                hostname=scan_result['hostname'],
-                os=f"{scan_result['os']['name']} {scan_result['os']['version']}",
-                environment='production'
-            )
+        if use_async:
+            # Use async client
+            result = asyncio.run(_submit_scan_async(
+                config, scan_result, scan_type_enum, wait, verbose
+            ))
+        else:
+            # Use sync client
+            client = SecureSysAPIClient(config.api_url, config.api_key)
             
-            # Submit scan
-            result = client.submit_scan(system['id'], scan_result)
-            
-            click.echo(click.style(f'✓ Scan submitted successfully!', fg='green'))
-            click.echo(f'   Scan ID: {result["scan_id"]}')
-            click.echo(f'   Status: {result["status"]}')
-        except Exception as e:
-            click.echo(click.style(f'Error submitting scan: {str(e)}', fg='red'))
-            sys.exit(1)
+            try:
+                # First, ensure system is registered
+                system = client.register_or_get_system(
+                    hostname=scan_result['hostname'],
+                    os=f"{scan_result['os']['name']} {scan_result['os']['version']}",
+                    environment='production'
+                )
+                
+                # Submit scan
+                result = client.submit_scan(system['id'], scan_result)
+                
+                click.echo(click.style(f'✓ Scan submitted successfully!', fg='green'))
+                click.echo(f'   Scan ID: {result["scan_id"]}')
+                click.echo(f'   Status: {result["status"]}')
+            except Exception as e:
+                click.echo(click.style(f'Error submitting scan: {str(e)}', fg='red'))
+                sys.exit(1)
     else:
         # Print output
         click.echo()

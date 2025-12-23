@@ -66,7 +66,7 @@ def cleanup_old_scans_task(days: int = 90):
     Removes raw payload from completed scans older than threshold.
     Keeps summary data for historical reporting.
     """
-    from core.models import Scan
+    from .models import Scan
     
     cutoff_date = timezone.now() - timezone.timedelta(days=days)
     old_scans = Scan.objects.filter(
@@ -94,7 +94,7 @@ def generate_daily_report_task():
     
     Can be scheduled as a periodic task.
     """
-    from core.models import System, Scan, Finding
+    from .models import System, Scan, Finding
     
     today = timezone.now().date()
     
@@ -123,7 +123,7 @@ def _mark_scan_failed_safe(scan_id: str, error_message: str):
     even if retry fails.
     """
     try:
-        from core.models import Scan
+        from .models import Scan
         scan = Scan.objects.get(id=scan_id)
         scan.mark_failed(error_message)
     except Exception:

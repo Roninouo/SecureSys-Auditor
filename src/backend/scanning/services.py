@@ -68,7 +68,7 @@ class ScanProcessingService:
         Raises:
             ValueError: If scan not found or invalid state
         """
-        from core.models import Scan, Finding, Recommendation
+        from .models import Scan, Finding, Recommendation
         from core.analysis import SecurityAnalyzer
         
         start_time = time.time()
@@ -154,7 +154,7 @@ class ScanProcessingService:
         Returns:
             List of created Finding objects
         """
-        from core.models import Finding, Recommendation
+        from .models import Finding, Recommendation
         
         findings = []
         

@@ -95,6 +95,13 @@ export interface DashboardStats {
   }
   average_risk_score: number
   total_unresolved_findings: number
+  recent_scans?: Scan[]
+  systems_by_environment?: {
+    development?: number
+    staging?: number
+    production?: number
+    testing?: number
+  }
 }
 
 export interface AuditLog {
