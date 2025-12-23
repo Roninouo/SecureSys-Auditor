@@ -68,8 +68,15 @@ INSTALLED_APPS = [
     'django_celery_results',
     'django_celery_beat',
     
-    # Local apps
+    # Local apps - Core (legacy, being refactored)
     'core',
+    
+    # Local apps - Modular architecture
+    'authentication',  # Auth providers, permissions
+    'scanning',        # Scan processing
+    'reports',         # PDF report generation
+    'webhooks',        # Webhook notifications
+    'observability',   # Telemetry, metrics, health checks
 ]
 
 MIDDLEWARE = [
@@ -81,6 +88,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Observability - adds request context to traces
+    'observability.middleware.HealthCheckBypassMiddleware',
+    'observability.middleware.RequestContextMiddleware',
 ]
 
 ROOT_URLCONF = 'backend.urls'
@@ -146,7 +156,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Uses Chain of Responsibility pattern - tries OIDC first, then JWT
+        'authentication.backends.ProviderChainAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -161,6 +172,15 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour',
+        'scans': '100/hour',  # Rate limit for scan submissions
+    },
 }
 
 # Simple JWT Configuration
@@ -194,6 +214,25 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+
+# Dedicated queues for different task types (scalability improvement)
+# This prevents report generation from blocking scan processing
+CELERY_TASK_QUEUES = {
+    'default': {'exchange': 'default', 'routing_key': 'default'},
+    'scans': {'exchange': 'scans', 'routing_key': 'scans'},
+    'reports': {'exchange': 'reports', 'routing_key': 'reports'},
+    'webhooks': {'exchange': 'webhooks', 'routing_key': 'webhooks'},
+}
+
+# Route tasks to appropriate queues
+CELERY_TASK_ROUTES = {
+    'scanning.tasks.*': {'queue': 'scans'},
+    'reports.tasks.*': {'queue': 'reports'},
+    'webhooks.tasks.*': {'queue': 'webhooks'},
+}
+
+# Worker prefetch multiplier (lower = better for long tasks)
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # Logging Configuration
 LOGGING = {
@@ -242,3 +281,40 @@ LOGGING = {
 
 # Create logs directory
 (BASE_DIR / 'logs').mkdir(exist_ok=True)
+
+# =============================================================================
+# OIDC/Keycloak Configuration (Enterprise IAM)
+# =============================================================================
+OIDC_AUTH = {
+    'ENABLED': os.getenv('OIDC_ENABLED', 'False').lower() == 'true',
+    'ISSUER': os.getenv('OIDC_ISSUER', 'http://localhost:8080/realms/securesys'),
+    'AUDIENCE': os.getenv('OIDC_AUDIENCE', 'securesys-backend'),
+    'AUTO_CREATE_USER': os.getenv('OIDC_AUTO_CREATE_USER', 'True').lower() == 'true',
+    'ALLOW_JWT_FALLBACK': os.getenv('OIDC_ALLOW_JWT_FALLBACK', 'True').lower() == 'true',
+    # Role mappings from Keycloak realm roles to Django roles
+    'ROLE_MAPPINGS': {
+        'admin': 'admin',
+        'auditor': 'auditor',
+        'viewer': 'viewer',
+    },
+}
+
+# Authentication providers (processed in order of priority)
+# Uses Strategy pattern - easily add new providers
+AUTH_PROVIDERS = [
+    'authentication.providers.KeycloakOIDCProvider',
+    'authentication.providers.SimpleJWTProvider',
+]
+
+# =============================================================================
+# OpenTelemetry Configuration (Observability)
+# =============================================================================
+OTEL_ENABLED = os.getenv('OTEL_ENABLED', 'False').lower() == 'true'
+OTEL_SERVICE_NAME = os.getenv('OTEL_SERVICE_NAME', 'securesys-backend')
+OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4317')
+
+# =============================================================================
+# Webhook Configuration (External Integrations)
+# =============================================================================
+WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'False').lower() == 'true'
+WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '')

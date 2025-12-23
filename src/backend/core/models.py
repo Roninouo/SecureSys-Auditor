@@ -444,3 +444,200 @@ class AuditLog(models.Model):
     def delete(self, *args, **kwargs):
         """Override delete to prevent deletion of audit logs."""
         raise ValueError("Audit logs cannot be deleted.")
+
+
+class WebhookEndpoint(models.Model):
+    """
+    Webhook endpoint configuration for external integrations.
+    Supports SIEM, alerting systems, and custom integrations.
+    """
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255, help_text='Descriptive name for this endpoint')
+    url = models.URLField(help_text='Webhook URL to receive events')
+    secret = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='HMAC secret for signing payloads (optional, uses global secret if empty)'
+    )
+    
+    # Event type filtering
+    event_types = models.JSONField(
+        default=list,
+        help_text='List of event types to send (e.g., ["scan.completed", "finding.critical"])'
+    )
+    
+    # Custom headers to include
+    headers = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Additional headers to include in webhook requests'
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    
+    # Retry configuration
+    max_retries = models.IntegerField(default=3)
+    retry_delay_seconds = models.IntegerField(default=60)
+    
+    # Tracking
+    last_triggered = models.DateTimeField(null=True, blank=True)
+    last_status_code = models.IntegerField(null=True, blank=True)
+    failure_count = models.IntegerField(default=0)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'webhook_endpoints'
+        verbose_name = 'webhook endpoint'
+        verbose_name_plural = 'webhook endpoints'
+        ordering = ['name']
+    
+    def __str__(self):
+        status = "active" if self.is_active else "inactive"
+        return f"{self.name} ({status})"
+    
+    def record_delivery(self, status_code: int, success: bool):
+        """Record webhook delivery attempt."""
+        self.last_triggered = timezone.now()
+        self.last_status_code = status_code
+        if success:
+            self.failure_count = 0
+        else:
+            self.failure_count += 1
+        self.save(update_fields=['last_triggered', 'last_status_code', 'failure_count', 'updated_at'])
+
+
+class SecurityMaturityAssessment(models.Model):
+    """
+    Extended security maturity assessment following industry frameworks.
+    Provides detailed maturity scoring across multiple domains.
+    """
+    
+    class MaturityLevel(models.IntegerChoices):
+        INITIAL = 1, 'Level 1 - Initial/Ad Hoc'
+        DEVELOPING = 2, 'Level 2 - Developing'
+        DEFINED = 3, 'Level 3 - Defined'
+        MANAGED = 4, 'Level 4 - Managed/Optimized'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scan = models.OneToOneField(
+        Scan,
+        on_delete=models.CASCADE,
+        related_name='maturity_assessment'
+    )
+    
+    # Overall maturity level (1-4)
+    overall_level = models.IntegerField(
+        choices=MaturityLevel.choices,
+        default=MaturityLevel.INITIAL
+    )
+    
+    # Domain-specific scores (1-4 scale)
+    identity_access_score = models.IntegerField(
+        default=1,
+        help_text='Identity & Access Management maturity'
+    )
+    asset_management_score = models.IntegerField(
+        default=1,
+        help_text='Asset Management maturity'
+    )
+    data_security_score = models.IntegerField(
+        default=1,
+        help_text='Data Security & Privacy maturity'
+    )
+    vulnerability_mgmt_score = models.IntegerField(
+        default=1,
+        help_text='Vulnerability Management maturity'
+    )
+    configuration_mgmt_score = models.IntegerField(
+        default=1,
+        help_text='Configuration Management maturity'
+    )
+    incident_response_score = models.IntegerField(
+        default=1,
+        help_text='Incident Response maturity'
+    )
+    monitoring_logging_score = models.IntegerField(
+        default=1,
+        help_text='Monitoring & Logging maturity'
+    )
+    network_security_score = models.IntegerField(
+        default=1,
+        help_text='Network Security maturity'
+    )
+    
+    # NIST CSF Function Scores
+    nist_identify_score = models.IntegerField(default=1, help_text='NIST Identify function score')
+    nist_protect_score = models.IntegerField(default=1, help_text='NIST Protect function score')
+    nist_detect_score = models.IntegerField(default=1, help_text='NIST Detect function score')
+    nist_respond_score = models.IntegerField(default=1, help_text='NIST Respond function score')
+    nist_recover_score = models.IntegerField(default=1, help_text='NIST Recover function score')
+    
+    # Detailed assessment data
+    assessment_details = models.JSONField(
+        default=dict,
+        help_text='Detailed control-by-control assessment results'
+    )
+    
+    # Recommendations based on maturity
+    improvement_roadmap = models.JSONField(
+        default=list,
+        help_text='Prioritized improvement recommendations'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'security_maturity_assessments'
+        verbose_name = 'security maturity assessment'
+        verbose_name_plural = 'security maturity assessments'
+    
+    def __str__(self):
+        return f"Maturity Assessment - Level {self.overall_level} - Scan {self.scan_id}"
+    
+    def calculate_overall_level(self) -> int:
+        """Calculate overall maturity level from domain scores."""
+        domain_scores = [
+            self.identity_access_score,
+            self.asset_management_score,
+            self.data_security_score,
+            self.vulnerability_mgmt_score,
+            self.configuration_mgmt_score,
+            self.incident_response_score,
+            self.monitoring_logging_score,
+            self.network_security_score,
+        ]
+        
+        avg_score = sum(domain_scores) / len(domain_scores)
+        
+        # Round down to nearest level
+        return max(1, min(4, int(avg_score)))
+    
+    def get_maturity_summary(self) -> dict:
+        """Get a summary of the maturity assessment."""
+        return {
+            'overall_level': self.overall_level,
+            'overall_label': self.get_overall_level_display(),
+            'domain_scores': {
+                'identity_access': self.identity_access_score,
+                'asset_management': self.asset_management_score,
+                'data_security': self.data_security_score,
+                'vulnerability_mgmt': self.vulnerability_mgmt_score,
+                'configuration_mgmt': self.configuration_mgmt_score,
+                'incident_response': self.incident_response_score,
+                'monitoring_logging': self.monitoring_logging_score,
+                'network_security': self.network_security_score,
+            },
+            'nist_csf_scores': {
+                'identify': self.nist_identify_score,
+                'protect': self.nist_protect_score,
+                'detect': self.nist_detect_score,
+                'respond': self.nist_respond_score,
+                'recover': self.nist_recover_score,
+            }
+        }
+

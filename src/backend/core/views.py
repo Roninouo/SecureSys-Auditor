@@ -1,6 +1,7 @@
 """
 API Views for the core app.
 """
+import io
 import logging
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
@@ -9,6 +10,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
+from django.http import FileResponse
+from django.conf import settings
 
 from .models import User, System, Scan, Finding, Recommendation, AuditLog
 from .serializers import (
@@ -25,8 +28,9 @@ from .serializers import (
     FindingDetailSerializer,
     RecommendationSerializer,
     AuditLogSerializer,
+    ReportGenerationSerializer,
 )
-from .tasks import process_scan
+from .tasks import process_scan, generate_pdf_report
 
 logger = logging.getLogger('core')
 
@@ -260,3 +264,152 @@ class DashboardStatsView(APIView):
             'average_risk_score': round(avg_score, 1),
             'total_unresolved_findings': sum(severity_counts.values())
         })
+
+
+class ReportGenerationView(APIView):
+    """
+    API endpoint for generating PDF security reports.
+    
+    Supports three report types:
+    - executive: High-level summary for leadership
+    - technical: Detailed findings for security teams
+    - compliance: NIST/ISO 27001 compliance mapping
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        """
+        Generate a PDF report for a completed scan.
+        
+        Request body:
+        {
+            "scan_id": <int>,
+            "report_type": "executive" | "technical" | "compliance",
+            "async": true | false (optional, default: true)
+        }
+        """
+        serializer = ReportGenerationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        scan_id = serializer.validated_data['scan_id']
+        report_type = serializer.validated_data['report_type']
+        async_generation = serializer.validated_data.get('async', True)
+        
+        # Verify scan exists and is completed
+        scan = get_object_or_404(Scan, id=scan_id)
+        
+        if scan.status != Scan.Status.COMPLETED:
+            return Response(
+                {'error': 'Report can only be generated for completed scans'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check user has access to this scan's system
+        if not request.user.is_staff:
+            if not scan.system.owners.filter(id=request.user.id).exists():
+                return Response(
+                    {'error': 'You do not have permission to generate reports for this scan'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        if async_generation:
+            # Queue async report generation
+            task = generate_pdf_report.delay(
+                scan_id=scan_id,
+                report_type=report_type,
+                requested_by=request.user.id
+            )
+            
+            logger.info(
+                f"Report generation queued: scan={scan_id}, type={report_type}, "
+                f"task={task.id}, user={request.user.email}"
+            )
+            
+            return Response({
+                'message': 'Report generation started',
+                'task_id': task.id,
+                'scan_id': scan_id,
+                'report_type': report_type,
+                'status': 'processing'
+            }, status=status.HTTP_202_ACCEPTED)
+        else:
+            # Synchronous generation (for smaller reports or testing)
+            try:
+                from .reports import generate_scan_report
+                
+                pdf_content = generate_scan_report(str(scan.id), report_type)
+                
+                # Create file response
+                response = FileResponse(
+                    io.BytesIO(pdf_content),
+                    content_type='application/pdf',
+                    as_attachment=True,
+                    filename=f'{scan.system.hostname}_{report_type}_report_{scan.id}.pdf'
+                )
+                
+                logger.info(
+                    f"Report generated synchronously: scan={scan_id}, type={report_type}, "
+                    f"user={request.user.email}"
+                )
+                
+                return response
+                
+            except Exception as e:
+                logger.error(f"Report generation failed: {e}", exc_info=True)
+                return Response(
+                    {'error': 'Report generation failed', 'detail': str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+    def get(self, request):
+        """
+        Get report generation status or download completed report.
+        
+        Query parameters:
+        - task_id: Celery task ID to check status
+        """
+        task_id = request.query_params.get('task_id')
+        
+        if not task_id:
+            return Response(
+                {'error': 'task_id query parameter required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        from celery.result import AsyncResult
+        
+        result = AsyncResult(task_id)
+        
+        if result.state == 'PENDING':
+            return Response({
+                'task_id': task_id,
+                'status': 'pending',
+                'message': 'Report generation is queued'
+            })
+        elif result.state == 'STARTED':
+            return Response({
+                'task_id': task_id,
+                'status': 'processing',
+                'message': 'Report is being generated'
+            })
+        elif result.state == 'SUCCESS':
+            report_info = result.result
+            return Response({
+                'task_id': task_id,
+                'status': 'completed',
+                'report_path': report_info.get('report_path'),
+                'report_type': report_info.get('report_type'),
+                'scan_id': report_info.get('scan_id'),
+                'download_url': f"/api/reports/download/{task_id}/"
+            })
+        elif result.state == 'FAILURE':
+            return Response({
+                'task_id': task_id,
+                'status': 'failed',
+                'error': str(result.result)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            return Response({
+                'task_id': task_id,
+                'status': result.state.lower()
+            })

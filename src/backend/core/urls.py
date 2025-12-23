@@ -15,7 +15,9 @@ from .views import (
     RecommendationViewSet,
     AuditLogViewSet,
     DashboardStatsView,
+    ReportGenerationView,
 )
+from .webhooks import WebhookEndpointViewSet
 
 # Create router and register viewsets
 router = DefaultRouter()
@@ -25,6 +27,7 @@ router.register(r'scans', ScanViewSet, basename='scan')
 router.register(r'findings', FindingViewSet, basename='finding')
 router.register(r'recommendations', RecommendationViewSet, basename='recommendation')
 router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
+router.register(r'webhooks', WebhookEndpointViewSet, basename='webhook')
 
 urlpatterns = [
     # Health check
@@ -36,6 +39,9 @@ urlpatterns = [
     
     # Dashboard
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard-stats'),
+    
+    # Reports
+    path('reports/generate/', ReportGenerationView.as_view(), name='generate-report'),
     
     # Router URLs
     path('', include(router.urls)),

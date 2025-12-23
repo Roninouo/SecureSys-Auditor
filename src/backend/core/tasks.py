@@ -159,3 +159,206 @@ def generate_daily_report():
     logger.info("Daily report generated", extra=report)
     
     return report
+
+
+@shared_task(bind=True, max_retries=2)
+def generate_pdf_report(
+    self,
+    scan_id: str,
+    report_type: str = 'executive',
+    company_name: str = 'Organization',
+    notify_webhook: bool = False
+):
+    """
+    Generate a PDF report asynchronously.
+    
+    This task:
+    1. Fetches scan data from database
+    2. Generates PDF using WeasyPrint
+    3. Stores the PDF in media storage
+    4. Optionally notifies via webhook
+    
+    Args:
+        scan_id: UUID of the scan to report on
+        report_type: Type of report (executive, technical, compliance)
+        company_name: Organization name for report header
+        notify_webhook: Whether to send webhook notification when complete
+    
+    Returns:
+        Dictionary with report file path and metadata
+    """
+    import os
+    from django.conf import settings
+    from .reports import generate_scan_report, ReportType, WEASYPRINT_AVAILABLE
+    from .models import Scan, AuditLog
+    
+    if not WEASYPRINT_AVAILABLE:
+        logger.error("PDF generation failed: WeasyPrint not installed")
+        raise RuntimeError("WeasyPrint is not available")
+    
+    try:
+        scan = Scan.objects.get(id=scan_id)
+        
+        logger.info(f"Generating {report_type} PDF report for scan {scan_id}")
+        
+        # Generate PDF
+        pdf_bytes = generate_scan_report(
+            scan_id=scan_id,
+            report_type=report_type,
+            company_name=company_name
+        )
+        
+        # Create reports directory if needed
+        reports_dir = settings.MEDIA_ROOT / 'reports'
+        reports_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate filename with timestamp
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"scan_{scan_id}_{report_type}_{timestamp}.pdf"
+        filepath = reports_dir / filename
+        
+        # Write PDF to file
+        with open(filepath, 'wb') as f:
+            f.write(pdf_bytes)
+        
+        # Log audit entry
+        AuditLog.objects.create(
+            action=AuditLog.Action.GENERATE_REPORT,
+            resource_type='scan',
+            resource_id=scan.id,
+            metadata={
+                'report_type': report_type,
+                'filename': filename,
+                'file_size': len(pdf_bytes),
+            }
+        )
+        
+        result = {
+            'scan_id': scan_id,
+            'report_type': report_type,
+            'filename': filename,
+            'file_path': str(filepath),
+            'file_size': len(pdf_bytes),
+            'generated_at': timezone.now().isoformat(),
+        }
+        
+        logger.info(f"PDF report generated successfully", extra=result)
+        
+        # Send webhook notification if enabled
+        if notify_webhook:
+            send_webhook_notification.delay(
+                event_type='report.generated',
+                payload=result
+            )
+        
+        return result
+        
+    except Scan.DoesNotExist:
+        logger.error(f"Scan not found for report generation: {scan_id}")
+        raise
+        
+    except Exception as e:
+        logger.error(f"Error generating PDF report: {str(e)}")
+        raise self.retry(exc=e, countdown=30)
+
+
+@shared_task(bind=True, max_retries=3)
+def send_webhook_notification(self, event_type: str, payload: dict):
+    """
+    Send webhook notification to configured endpoints.
+    
+    Supports SIEM integration and external alerting systems.
+    
+    Args:
+        event_type: Type of event (e.g., 'scan.completed', 'finding.critical')
+        payload: Event payload data
+    """
+    import hmac
+    import hashlib
+    import json
+    import requests
+    from django.conf import settings
+    
+    if not settings.WEBHOOK_ENABLED:
+        logger.debug("Webhooks disabled, skipping notification")
+        return {'status': 'skipped', 'reason': 'webhooks_disabled'}
+    
+    from .models import WebhookEndpoint
+    
+    try:
+        # Get active webhook endpoints for this event type
+        endpoints = WebhookEndpoint.objects.filter(
+            is_active=True,
+            event_types__contains=[event_type]
+        )
+        
+        if not endpoints.exists():
+            logger.debug(f"No webhook endpoints configured for event: {event_type}")
+            return {'status': 'skipped', 'reason': 'no_endpoints'}
+        
+        results = []
+        
+        for endpoint in endpoints:
+            try:
+                # Prepare payload
+                webhook_payload = {
+                    'event_type': event_type,
+                    'timestamp': timezone.now().isoformat(),
+                    'data': payload,
+                }
+                
+                # Sign payload with HMAC
+                payload_json = json.dumps(webhook_payload, sort_keys=True)
+                signature = hmac.new(
+                    endpoint.secret.encode() if endpoint.secret else settings.WEBHOOK_SECRET.encode(),
+                    payload_json.encode(),
+                    hashlib.sha256
+                ).hexdigest()
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'X-SecureSys-Event': event_type,
+                    'X-SecureSys-Signature': f'sha256={signature}',
+                    'X-SecureSys-Timestamp': str(int(timezone.now().timestamp())),
+                }
+                
+                # Add custom headers
+                if endpoint.headers:
+                    headers.update(endpoint.headers)
+                
+                # Send webhook
+                response = requests.post(
+                    endpoint.url,
+                    json=webhook_payload,
+                    headers=headers,
+                    timeout=30
+                )
+                
+                results.append({
+                    'endpoint': endpoint.url,
+                    'status_code': response.status_code,
+                    'success': response.status_code < 400,
+                })
+                
+                logger.info(f"Webhook sent to {endpoint.url}", extra={
+                    'event_type': event_type,
+                    'status_code': response.status_code
+                })
+                
+            except requests.RequestException as e:
+                logger.error(f"Webhook delivery failed: {endpoint.url}", extra={
+                    'error': str(e),
+                    'event_type': event_type
+                })
+                results.append({
+                    'endpoint': endpoint.url,
+                    'success': False,
+                    'error': str(e),
+                })
+        
+        return {'status': 'completed', 'results': results}
+        
+    except Exception as e:
+        logger.error(f"Error sending webhook: {str(e)}")
+        raise self.retry(exc=e, countdown=60)
+

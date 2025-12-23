@@ -231,3 +231,72 @@ class FindingDetailSerializer(serializers.ModelSerializer):
             'is_resolved', 'resolved_at', 'created_at', 'updated_at',
             'recommendations'
         ]
+
+
+from .models import WebhookEndpoint, SecurityMaturityAssessment
+
+
+class WebhookEndpointSerializer(serializers.ModelSerializer):
+    """Serializer for WebhookEndpoint model."""
+    
+    class Meta:
+        model = WebhookEndpoint
+        fields = [
+            'id', 'name', 'url', 'secret', 'event_types', 'headers',
+            'is_active', 'max_retries', 'retry_delay_seconds',
+            'last_triggered', 'last_status_code', 'failure_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'last_triggered', 'last_status_code', 'failure_count',
+            'created_at', 'updated_at'
+        ]
+        extra_kwargs = {
+            'secret': {'write_only': True}  # Don't expose secret in responses
+        }
+
+
+class SecurityMaturityAssessmentSerializer(serializers.ModelSerializer):
+    """Serializer for SecurityMaturityAssessment model."""
+    
+    maturity_summary = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SecurityMaturityAssessment
+        fields = [
+            'id', 'scan', 'overall_level',
+            'identity_access_score', 'asset_management_score',
+            'data_security_score', 'vulnerability_mgmt_score',
+            'configuration_mgmt_score', 'incident_response_score',
+            'monitoring_logging_score', 'network_security_score',
+            'nist_identify_score', 'nist_protect_score',
+            'nist_detect_score', 'nist_respond_score', 'nist_recover_score',
+            'assessment_details', 'improvement_roadmap',
+            'created_at', 'updated_at', 'maturity_summary'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_maturity_summary(self, obj):
+        return obj.get_maturity_summary()
+
+
+class ReportGenerationSerializer(serializers.Serializer):
+    """Serializer for PDF report generation requests."""
+    
+    scan_id = serializers.UUIDField()
+    report_type = serializers.ChoiceField(
+        choices=['executive', 'technical', 'compliance'],
+        default='executive'
+    )
+    company_name = serializers.CharField(max_length=255, default='Organization')
+    async_generation = serializers.BooleanField(default=True)
+    notify_webhook = serializers.BooleanField(default=False)
+    
+    def validate_scan_id(self, value):
+        """Validate that the scan exists and is completed."""
+        if not Scan.objects.filter(id=value, status='completed').exists():
+            raise serializers.ValidationError(
+                'Scan not found or not completed.'
+            )
+        return value
+

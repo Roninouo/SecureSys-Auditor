@@ -10,5 +10,11 @@ class CoreConfig(AppConfig):
     verbose_name = 'SecureSys Core'
 
     def ready(self):
-        """Import signals when app is ready."""
+        """Initialize app components when Django is ready."""
+        # Import signals
         import core.signals  # noqa: F401
+        
+        # Initialize OpenTelemetry instrumentation
+        from core.telemetry import initialize_telemetry
+        initialize_telemetry()
+

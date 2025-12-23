@@ -1,0 +1,197 @@
+{
+  "realm": "securesys",
+  "enabled": true,
+  "displayName": "SecureSys Auditor",
+  "displayNameHtml": "<strong>SecureSys Auditor</strong>",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator with full access",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "auditor",
+        "description": "Security auditor with scan and report access",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "viewer",
+        "description": "Read-only access to dashboards and reports",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  },
+  "defaultRoles": ["viewer"],
+  "clients": [
+    {
+      "clientId": "securesys-backend",
+      "name": "SecureSys Backend API",
+      "description": "Django REST API Backend",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "backend-client-secret-change-in-production",
+      "bearerOnly": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ]
+    },
+    {
+      "clientId": "securesys-frontend",
+      "name": "SecureSys Frontend Application",
+      "description": "React SPA Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "https://your-domain.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://your-domain.com"
+      ],
+      "defaultClientScopes": [
+        "web-origins",
+        "roles",
+        "profile",
+        "email"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "securesys-agent",
+      "name": "SecureSys Agent",
+      "description": "Scanner Agent Authentication",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "agent-client-secret-change-in-production",
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "roles",
+        "profile"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "admin@securesys.local",
+      "email": "admin@securesys.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123!",
+          "temporary": true
+        }
+      ],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "auditor@securesys.local",
+      "email": "auditor@securesys.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Auditor",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "auditor123!",
+          "temporary": true
+        }
+      ],
+      "realmRoles": ["auditor"]
+    },
+    {
+      "username": "viewer@securesys.local",
+      "email": "viewer@securesys.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Viewer",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer123!",
+          "temporary": true
+        }
+      ],
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "securesys-frontend",
+      "roles": ["admin", "auditor", "viewer"]
+    }
+  ],
+  "clientScopeMappings": {},
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and specialChars(1) and digits(1) and notUsername",
+  "accessTokenLifespan": 3600,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "actionTokenGeneratedByAdminLifespan": 43200,
+  "actionTokenGeneratedByUserLifespan": 300,
+  "smtpServer": {},
+  "eventsEnabled": true,
+  "eventsListeners": ["jboss-logging"],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "CODE_TO_TOKEN",
+    "CODE_TO_TOKEN_ERROR",
+    "CLIENT_LOGIN",
+    "CLIENT_LOGIN_ERROR",
+    "REFRESH_TOKEN",
+    "REFRESH_TOKEN_ERROR",
+    "IMPERSONATE",
+    "USER_INFO_REQUEST",
+    "USER_INFO_REQUEST_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": true
+}

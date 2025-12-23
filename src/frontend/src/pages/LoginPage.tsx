@@ -1,22 +1,27 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Shield, Loader2 } from 'lucide-react'
+import { Shield, Loader2, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useAuthStore } from '@/stores/authStore'
 import { authApi } from '@/services/api'
+import { oidcService } from '@/services/oidc'
 
 interface LoginForm {
   email: string
   password: string
 }
 
+// Check if OIDC is enabled
+const OIDC_ENABLED = import.meta.env.VITE_OIDC_ENABLED === 'true'
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore((state) => state.login)
   const [isLoading, setIsLoading] = useState(false)
+  const [isOIDCLoading, setIsOIDCLoading] = useState(false)
   const [error, setError] = useState('')
 
   const {
@@ -47,6 +52,19 @@ export default function LoginPage() {
       setError(err.response?.data?.detail || 'Invalid credentials')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleOIDCLogin = async () => {
+    setIsOIDCLoading(true)
+    setError('')
+    
+    try {
+      await oidcService.login()
+      // Note: This will redirect to Keycloak, so we won't reach here
+    } catch (err: any) {
+      setError('Failed to initiate SSO login')
+      setIsOIDCLoading(false)
     }
   }
 
@@ -124,6 +142,41 @@ export default function LoginPage() {
                 'Sign in'
               )}
             </Button>
+
+            {OIDC_ENABLED && (
+              <>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white dark:bg-gray-800 px-2 text-gray-500">
+                      Or continue with
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleOIDCLogin}
+                  disabled={isOIDCLoading}
+                >
+                  {isOIDCLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Redirecting to SSO...
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="mr-2 h-4 w-4" />
+                      Enterprise SSO (Keycloak)
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
           </form>
         </CardContent>
       </Card>
