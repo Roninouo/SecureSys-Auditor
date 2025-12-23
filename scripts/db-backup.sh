@@ -41,18 +41,39 @@ else
     exit 1
 fi
 
+# Encryption
+if [ -n "${BACKUP_ENCRYPTION_KEY:-}" ]; then
+    log "Encrypting backup..."
+    openssl enc -aes-256-cbc -salt -in "${BACKUP_FILE}" -out "${BACKUP_FILE}.enc" -pass pass:"${BACKUP_ENCRYPTION_KEY}"
+    rm "${BACKUP_FILE}"
+    BACKUP_FILE="${BACKUP_FILE}.enc"
+    log "Backup encrypted: ${BACKUP_FILE}"
+fi
+
+# Offsite Backup
+if [ -n "${AWS_S3_BUCKET:-}" ]; then
+    log "Uploading to S3: s3://${AWS_S3_BUCKET}/backups/$(basename "${BACKUP_FILE}")"
+    if command -v aws >/dev/null 2>&1; then
+        aws s3 cp "${BACKUP_FILE}" "s3://${AWS_S3_BUCKET}/backups/"
+        log "Upload complete"
+    else
+        log "WARNING: aws CLI not found, skipping S3 upload"
+    fi
+fi
+
 # Calculate backup size
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 log "Backup created successfully: ${BACKUP_FILE} (${BACKUP_SIZE})"
 
 # Cleanup old backups
 log "Cleaning up backups older than ${RETENTION_DAYS} days..."
-DELETED_COUNT=$(find "${BACKUP_DIR}" -name "securesys_backup_*.sql.gz" -mtime +${RETENTION_DAYS} -delete -print | wc -l)
-log "Deleted ${DELETED_COUNT} old backup(s)"
+# Note: This cleanup only handles local files. S3 lifecycle policies should handle remote backups.
+find "${BACKUP_DIR}" -name "securesys_backup_*" -mtime +${RETENTION_DAYS} -delete
+log "Cleanup complete"
 
 # List current backups
 log "Current backups:"
-ls -lh "${BACKUP_DIR}"/securesys_backup_*.sql.gz 2>/dev/null || echo "No backups found"
+ls -lh "${BACKUP_DIR}"/securesys_backup_* 2>/dev/null || echo "No backups found"
 
 # Calculate total backup storage used
 TOTAL_SIZE=$(du -sh "${BACKUP_DIR}" | cut -f1)

@@ -41,6 +41,16 @@ python manage.py migrate_scanning_data --verify
 ### Step 1: Pre-Migration Checklist
 
 1. **Backup Database**
+   
+   Use the provided backup script which supports encryption and offsite storage:
+   ```bash
+   # Run backup script
+   ./scripts/db-backup.sh
+   ```
+   
+   Ensure `BACKUP_ENCRYPTION_KEY` and `AWS_S3_BUCKET` are set in your environment for encryption and offsite backup.
+
+   Alternatively, use the management command or manual dump:
    ```bash
    # Automated backup (recommended)
    python manage.py migrate_scanning_data --backup

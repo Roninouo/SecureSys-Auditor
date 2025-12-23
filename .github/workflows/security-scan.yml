@@ -1,4 +1,4 @@
-# Dependency Scanning and Security Automation
+do the rest# Dependency Scanning and Security Automation
 # Runs on schedule and PR events
 # Uses multiple scanners for comprehensive coverage
 
@@ -47,21 +47,24 @@ jobs:
           pip-audit -r reqs/requirements-base.txt \
             --format json \
             --output pip-audit-report.json \
-            --desc on || true
+            --desc on
       
       - name: Run Safety check
+        if: always()
         run: |
           safety check -r reqs/requirements-base.txt \
             --json \
-            --output safety-report.json || true
+            --output safety-report.json
       
       - name: Upload pip-audit results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pip-audit-report
           path: pip-audit-report.json
       
       - name: Upload Safety results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: safety-report
@@ -167,14 +170,16 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
           vuln-type: 'os,library'
+          exit-code: '1'
       
       - name: Upload Trivy scan results to GitHub Security
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
       
       - name: Run Trivy in table format for PR comment
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'securesys/backend:scan'

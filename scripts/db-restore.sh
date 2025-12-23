@@ -55,12 +55,29 @@ fi
 
 log "Preparing to restore from: ${BACKUP_FILE}"
 
+# Decryption
+TEMP_DECRYPTED_FILE=""
+if [[ "${BACKUP_FILE}" == *.enc ]]; then
+    if [ -z "${BACKUP_ENCRYPTION_KEY:-}" ]; then
+        log_error "Backup is encrypted but BACKUP_ENCRYPTION_KEY is not set!"
+        exit 1
+    fi
+    log "Decrypting backup..."
+    TEMP_DECRYPTED_FILE="/tmp/restore_$(date +%s).sql.gz"
+    openssl enc -d -aes-256-cbc -in "${BACKUP_FILE}" -out "${TEMP_DECRYPTED_FILE}" -pass pass:"${BACKUP_ENCRYPTION_KEY}"
+    BACKUP_FILE="${TEMP_DECRYPTED_FILE}"
+    log "Decryption complete"
+fi
+
 # Verify backup integrity
 log "Verifying backup integrity..."
 if gunzip -t "${BACKUP_FILE}"; then
     log_success "Backup integrity verified"
 else
     log_error "Backup file is corrupted!"
+    if [ -n "${TEMP_DECRYPTED_FILE}" ]; then
+        rm -f "${TEMP_DECRYPTED_FILE}"
+    fi
     exit 1
 fi
 
@@ -73,6 +90,9 @@ if [ "${FORCE_RESTORE}" != "--force" ]; then
     read -p "Are you sure you want to continue? (yes/no): " CONFIRM
     if [ "${CONFIRM}" != "yes" ]; then
         log "Restore cancelled by user"
+        if [ -n "${TEMP_DECRYPTED_FILE}" ]; then
+            rm -f "${TEMP_DECRYPTED_FILE}"
+        fi
         exit 0
     fi
 fi
@@ -97,7 +117,14 @@ gunzip -c "${BACKUP_FILE}" | pg_restore \
     --no-privileges \
     --dbname="${PGDATABASE:-securesys_db}"
 
-if [ $? -eq 0 ]; then
+RESTORE_EXIT_CODE=$?
+
+# Cleanup temp file
+if [ -n "${TEMP_DECRYPTED_FILE}" ]; then
+    rm -f "${TEMP_DECRYPTED_FILE}"
+fi
+
+if [ $RESTORE_EXIT_CODE -eq 0 ]; then
     log_success "Database restored successfully!"
 else
     log_error "Database restore failed!"
