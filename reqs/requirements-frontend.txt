@@ -1,0 +1,44 @@
+# Frontend Requirements Reference
+# Note: Frontend uses npm/yarn - this file documents the main dependencies
+
+# Core Framework
+# react: ^18.2.0
+# react-dom: ^18.2.0
+# typescript: ^5.3.0
+
+# Routing
+# react-router-dom: ^6.21.0
+
+# State Management
+# @tanstack/react-query: ^5.17.0
+# zustand: ^4.4.0
+
+# UI Components
+# @radix-ui/react-*: latest
+# tailwindcss: ^3.4.0
+# @tailwindcss/forms: ^0.5.7
+# framer-motion: ^10.17.0
+
+# HTTP Client
+# axios: ^1.6.0
+
+# Forms & Validation
+# react-hook-form: ^7.49.0
+# zod: ^3.22.0
+
+# Charts & Visualization
+# recharts: ^2.10.0
+
+# Utilities
+# date-fns: ^3.2.0
+# clsx: ^2.1.0
+# class-variance-authority: ^0.7.0
+
+# Icons
+# lucide-react: ^0.303.0
+
+# Development
+# eslint: ^8.56.0
+# prettier: ^3.1.0
+# vite: ^5.0.0
+# @vitejs/plugin-react: ^4.2.0

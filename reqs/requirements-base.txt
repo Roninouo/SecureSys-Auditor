@@ -1,0 +1,25 @@
+# Base Requirements for SecureSys Auditor
+# Core Python dependencies shared across environments
+
+# Django Core
+Django>=4.2,<5.0
+djangorestframework>=3.14,<4.0
+django-cors-headers>=4.3,<5.0
+django-filter>=23.5,<24.0
+
+# Database
+psycopg2-binary>=2.9,<3.0
+
+# Authentication & Security
+djangorestframework-simplejwt>=5.3,<6.0
+PyJWT>=2.8,<3.0
+python-dotenv>=1.0,<2.0
+
+# Data Validation
+pydantic>=2.5,<3.0
+
+# UUID Support
+uuid>=1.30
+
+# Timezone
+pytz>=2023.3

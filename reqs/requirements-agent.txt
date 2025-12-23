@@ -1,0 +1,23 @@
+# Agent Requirements
+# Dependencies for the CLI security agent
+
+# HTTP Client
+requests>=2.31,<3.0
+httpx>=0.26,<1.0
+
+# CLI Framework
+click>=8.1,<9.0
+rich>=13.7,<14.0
+
+# System Information
+psutil>=5.9,<6.0
+platform>=1.0.8
+
+# Data Serialization
+pydantic>=2.5,<3.0
+
+# Security
+cryptography>=41.0,<42.0
+
+# JSON handling
+orjson>=3.9,<4.0
