@@ -28,7 +28,7 @@ safety>=2.3,<3.0
 
 # Debug
 django-debug-toolbar>=4.2,<5.0
-ipython>=8.18,<9.0
+ipython>=8.18,<10.0
 
 # Documentation
 mkdocs>=1.5,<2.0
