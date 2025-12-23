@@ -6,7 +6,7 @@
 
 * **Local Agent / CLI:**
 
-  * **Rust** (preferred for security & performance) or **Go**
+  * **Rust** (preferred for security & performance)
 * **Backend API & Orchestration:**
 
   * **Django + Django Rest Framework (DRF)**
@@ -92,7 +92,7 @@
   * Command: `securesys-agent scan --output json`
   * Generates signed JSON output
 * **Priority:** P0
-* **Tech:** Rust / Go, CLI
+* **Tech:** Rust CLI
 
 ---
 
