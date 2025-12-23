@@ -15,7 +15,7 @@ faker>=22.0,<23.0
 requests>=2.31,<3.0  # For E2E tests
 
 # Code Quality
-black>=23.12,<24.0
+black>=23.12,<26.0
 ruff>=0.1,<1.0
 flake8>=6.1,<7.0
 isort>=5.13,<6.0
