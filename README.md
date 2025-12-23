@@ -8,6 +8,8 @@ A comprehensive security assessment platform that automates the collection, anal
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)
 ![Django](https://img.shields.io/badge/django-4.2%2B-green.svg)
 ![React](https://img.shields.io/badge/react-18.2%2B-61dafb.svg)
+![CI](https://github.com/securesys/auditor/actions/workflows/ci.yml/badge.svg)
+![Coverage](https://codecov.io/gh/securesys/auditor/branch/main/graph/badge.svg)
 
 ---
 
@@ -101,8 +103,55 @@ Agent Scan → API Ingestion → Risk Analysis → Dashboard Visualization
 - Node.js 18+
 - PostgreSQL 13+
 - Redis 6+
+- Docker & Docker Compose (recommended)
 
-### Backend Setup
+### Using Docker (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/securesys/auditor.git
+cd SecureSys-Auditor
+
+# Copy environment template
+cp env.example .env
+# Edit .env with your configuration
+
+# Start all services
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f backend
+
+# The API will be available at http://localhost:8000
+# Health check: http://localhost:8000/api/v1/health/
+```
+
+### Docker Commands
+
+```bash
+# Start services in background
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Rebuild after code changes
+docker-compose up --build -d
+
+# View Celery worker logs
+docker-compose logs -f celery-worker
+
+# Run migrations manually
+docker-compose exec backend python manage.py migrate
+
+# Create superuser
+docker-compose exec backend python manage.py createsuperuser
+```
+
+### Backend Setup (Manual)
 
 ```bash
 # Clone repository
@@ -227,16 +276,54 @@ securesys-agent status
 
 ## 🔧 Configuration
 
+### Environment Variables
+
+Copy `env.example` to `.env` and configure the required variables:
+
+```bash
+cp env.example .env
+```
+
+#### Required in Production
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `DJANGO_SECRET_KEY` | Django secret key (generate unique) | `django-insecure-xxx` |
+| `ALLOWED_HOSTS` | Comma-separated allowed hostnames | `api.example.com` |
+| `ENVIRONMENT` | Environment name | `production` |
+
+#### Database Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DB_NAME` | PostgreSQL database name | `securesys_db` |
+| `DB_USER` | PostgreSQL username | `securesys_user` |
+| `DB_PASSWORD` | PostgreSQL password | - |
+| `DB_HOST` | PostgreSQL host | `localhost` |
+| `DB_PORT` | PostgreSQL port | `5432` |
+
+#### Security Notes
+
+- **`DEBUG`**: Defaults to `False`. Cannot be `True` in production.
+- **`DJANGO_SECRET_KEY`**: Required in production. Generate with:
+  ```bash
+  python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+  ```
+- **`ALLOWED_HOSTS`**: Required in production. Must list all valid hostnames.
+
 ### Backend Environment Variables
 
 ```bash
 # .env file
 DEBUG=False
-SECRET_KEY=your-secret-key
-DATABASE_URL=postgres://user:pass@localhost/securesys
-REDIS_URL=redis://localhost:6379/0
-ALLOWED_HOSTS=localhost,127.0.0.1
-CORS_ALLOWED_ORIGINS=http://localhost:5173
+DJANGO_SECRET_KEY=your-secret-key
+ENVIRONMENT=production
+ALLOWED_HOSTS=your-domain.com,api.your-domain.com
+DB_NAME=securesys_db
+DB_USER=securesys_user
+DB_PASSWORD=your-secure-password
+CELERY_BROKER_URL=redis://localhost:6379/0
+CORS_ALLOWED_ORIGINS=https://your-domain.com
 ```
 
 ### Frontend Environment Variables
@@ -291,25 +378,32 @@ SecureSys-Auditor/
 ### Running Tests
 
 ```bash
-# Backend tests
-cd src/backend
-pytest
+# Run all tests with coverage
+pytest tests/ --cov=src --cov-report=term-missing --cov-fail-under=60
+
+# Backend tests only
+pytest tests/test_models.py tests/test_tasks.py tests/test_analysis.py -v
+
+# Agent tests only
+pytest tests/test_agent.py -v
 
 # Frontend tests
 cd src/frontend
 npm run test
-
-# Agent tests
-cd src/agent
-pytest
 ```
 
 ### Code Quality
 
 ```bash
-# Backend linting
-ruff check src/backend
-black src/backend --check
+# Run all linters
+black --check src/ tests/
+flake8 src/ tests/
+isort --check-only src/ tests/
+bandit -r src/ -x tests/ -ll
+
+# Auto-format code
+black src/ tests/
+isort src/ tests/
 
 # Frontend linting
 cd src/frontend
@@ -340,6 +434,48 @@ celery -A backend worker -l INFO
 - All sensitive data encrypted at rest
 - TLS required for production API communication
 - Audit logging for all sensitive operations
+
+### Agent Security
+
+The agent implements several security measures:
+
+#### TLS Enforcement
+- Agent requires HTTPS for API communication in production
+- HTTP is only allowed for `localhost` with explicit opt-in for development
+
+#### Payload Signing (HMAC-SHA256)
+All scan submissions are signed to ensure integrity:
+
+```
+X-Signature: HMAC-SHA256(api_key, timestamp + "." + json_payload)
+X-Timestamp: Unix timestamp
+```
+
+- Prevents tampering with scan data in transit
+- Timestamp prevents replay attacks (5-minute window)
+- Backend validates signature before processing
+
+#### Minimal Telemetry Mode
+When enabled (default), filters sensitive data from scans:
+- IP addresses and MAC addresses
+- User home paths
+- Environment variables
+- SSH keys and credentials
+- Command history
+
+Configure in agent:
+```bash
+# In config file or environment
+SECURESYS_MINIMAL_TELEMETRY=true
+```
+
+### Credential Rotation
+
+For enhanced security, rotate credentials periodically:
+
+1. **API Keys**: Generate new API key in dashboard, update agent config, invalidate old key
+2. **JWT Tokens**: Tokens expire automatically (access: 1h, refresh: 7d)
+3. **Django Secret Key**: Rotate during maintenance windows, invalidates all sessions
 
 ---
 

@@ -9,6 +9,8 @@ Collects security-relevant information from the local system including:
 - Network configuration
 - Firewall status
 - SSH configuration (if applicable)
+
+Supports minimal telemetry mode to filter sensitive data.
 """
 
 import os
@@ -16,23 +18,91 @@ import platform
 import socket
 import subprocess
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 import psutil
+
+
+def filter_sensitive_data(
+    data: Dict[str, Any],
+    sensitive_fields: List[str]
+) -> Dict[str, Any]:
+    """
+    Recursively filter sensitive fields from scan data.
+
+    Args:
+        data: The data dictionary to filter
+        sensitive_fields: List of field names to remove
+
+    Returns:
+        Filtered data dictionary
+    """
+    if not isinstance(data, dict):
+        return data
+
+    filtered = {}
+    for key, value in data.items():
+        # Skip sensitive fields
+        key_lower = key.lower()
+        if any(sf.lower() in key_lower for sf in sensitive_fields):
+            continue
+
+        # Recursively filter nested dicts
+        if isinstance(value, dict):
+            filtered[key] = filter_sensitive_data(value, sensitive_fields)
+        elif isinstance(value, list):
+            filtered[key] = [
+                filter_sensitive_data(item, sensitive_fields)
+                if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            filtered[key] = value
+
+    return filtered
 
 
 class SystemScanner:
     """
     Main scanner class that collects system security data.
+
+    Args:
+        minimal_telemetry: When True, filters sensitive data from results
+        sensitive_fields: List of field names to filter (used with minimal_telemetry)
     """
-    
-    def __init__(self):
+
+    # Default sensitive fields to filter in minimal telemetry mode
+    DEFAULT_SENSITIVE_FIELDS = [
+        'ip_address',
+        'mac_address',
+        'user_home_paths',
+        'environment_variables',
+        'command_history',
+        'ssh_keys',
+        'private_keys',
+        'passwords',
+        'tokens',
+        'credentials',
+    ]
+
+    def __init__(
+        self,
+        minimal_telemetry: bool = True,
+        sensitive_fields: Optional[List[str]] = None
+    ):
         self.platform = platform.system().lower()
         self.scan_time = datetime.utcnow().isoformat()
-    
+        self.minimal_telemetry = minimal_telemetry
+        self.sensitive_fields = sensitive_fields or self.DEFAULT_SENSITIVE_FIELDS
+
     def collect_all(self) -> Dict[str, Any]:
-        """Collect all available system information."""
-        return {
+        """
+        Collect all available system information.
+
+        Returns:
+            Dictionary containing all scan data, filtered if minimal_telemetry is enabled
+        """
+        data = {
             'hostname': self.get_hostname(),
             'os': self.get_os_info(),
             'scan_time': self.scan_time,
@@ -43,7 +113,16 @@ class SystemScanner:
             'firewall': self.get_firewall_status(),
             'ssh_config': self.get_ssh_config(),
             'password_policy': self.get_password_policy(),
+            '_metadata': {
+                'minimal_telemetry': self.minimal_telemetry,
+                'scanner_version': '1.0.0',
+            }
         }
+
+        if self.minimal_telemetry:
+            data = filter_sensitive_data(data, self.sensitive_fields)
+
+        return data
     
     def get_hostname(self) -> str:
         """Get system hostname."""

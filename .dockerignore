@@ -1,0 +1,29 @@
+# Ignore everything by default
+*
+
+# Allow specific directories and files
+!src/backend/**
+!reqs/**
+
+# Exclude unnecessary files from allowed directories
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/.coverage
+**/.mypy_cache
+**/htmlcov
+**/*.egg-info
+**/.eggs
+**/node_modules
+**/.git
+**/.gitignore
+**/.env
+**/.env.*
+**/venv
+**/SecureSys-venv
+**/*.log
+**/logs
+**/.DS_Store
+**/Thumbs.db

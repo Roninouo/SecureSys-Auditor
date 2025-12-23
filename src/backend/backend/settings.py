@@ -3,6 +3,7 @@ Django settings for SecureSys Auditor backend.
 """
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -14,13 +15,41 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Environment detection
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development').lower()
+IS_PRODUCTION = ENVIRONMENT == 'production'
+IS_TESTING = 'pytest' in sys.modules or os.getenv('TESTING', 'False').lower() == 'true'
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-key-change-in-production')
+# In production, DJANGO_SECRET_KEY must be explicitly set
+_default_secret_key = 'django-insecure-dev-key-change-in-production' if not IS_PRODUCTION else None
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', _default_secret_key)
+
+if IS_PRODUCTION and not SECRET_KEY:
+    raise ValueError(
+        "DJANGO_SECRET_KEY environment variable is required in production. "
+        "Generate a secure key using: python -c \"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())\""
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
+# Default to False for security - must explicitly enable DEBUG
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+if IS_PRODUCTION and DEBUG:
+    raise ValueError(
+        "DEBUG cannot be True in production environment. "
+        "Set DEBUG=False or remove DEBUG from environment variables."
+    )
+
+# ALLOWED_HOSTS configuration
+# In production, ALLOWED_HOSTS must be explicitly configured
+_allowed_hosts_env = os.getenv('ALLOWED_HOSTS', '')
+if IS_PRODUCTION and not _allowed_hosts_env:
+    raise ValueError(
+        "ALLOWED_HOSTS environment variable is required in production. "
+        "Set ALLOWED_HOSTS to a comma-separated list of allowed hostnames."
+    )
+ALLOWED_HOSTS = _allowed_hosts_env.split(',') if _allowed_hosts_env else ['localhost', '127.0.0.1']
 
 # Application definition
 INSTALLED_APPS = [

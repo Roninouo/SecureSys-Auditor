@@ -1,22 +1,53 @@
 """
 Configuration Management for SecureSys Agent
+
+Handles configuration loading, saving, and validation for the agent.
+Supports minimal telemetry mode to filter sensitive data from scans.
 """
 
 import json
 import os
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
+
+
+# Fields that are filtered out when minimal_telemetry is enabled
+SENSITIVE_FIELDS = [
+    'ip_address',
+    'mac_address',
+    'user_home_paths',
+    'environment_variables',
+    'command_history',
+    'ssh_keys',
+    'private_keys',
+    'passwords',
+    'tokens',
+    'credentials',
+]
 
 
 @dataclass
 class Config:
-    """Agent configuration."""
+    """
+    Agent configuration.
+
+    Attributes:
+        api_url: URL of the SecureSys API
+        api_key: API key for authentication and payload signing
+        system_id: Cached system ID after registration
+        minimal_telemetry: When True, filters sensitive data from scan payloads
+        allow_insecure_localhost: Allow HTTP for localhost (dev only)
+    """
     api_url: Optional[str] = None
     api_key: Optional[str] = None
     system_id: Optional[str] = None
-    
+    minimal_telemetry: bool = True  # Default to privacy-preserving mode
+    allow_insecure_localhost: bool = False
+    sensitive_fields: List[str] = field(default_factory=lambda: SENSITIVE_FIELDS.copy())
+
     def to_dict(self):
+        """Convert config to dictionary."""
         return asdict(self)
 
 
