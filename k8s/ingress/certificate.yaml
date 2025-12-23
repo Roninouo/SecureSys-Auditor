@@ -1,0 +1,20 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: securesys-tls
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+spec:
+  secretName: securesys-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: securesys.io
+  dnsNames:
+    - securesys.io
+    - api.securesys.io
+    - www.securesys.io
+  privateKey:
+    algorithm: ECDSA
+    size: 256

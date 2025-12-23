@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_celery_results',
     'django_celery_beat',
+    'drf_spectacular',  # OpenAPI schema generation
     
     # Local apps - Core (legacy, being refactored)
     'core',
@@ -178,6 +179,12 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/hour',
+        'user': '1000/hour',
+        'scans': '100/hour',  # Rate limit for scan submissions
+    },
+    # OpenAPI schema generation
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
         'user': '1000/hour',
         'scans': '100/hour',  # Rate limit for scan submissions
     },
@@ -297,7 +304,32 @@ OIDC_AUTH = {
         'auditor': 'auditor',
         'viewer': 'viewer',
     },
+    # Token refresh settings
+    'TOKEN_REFRESH_WINDOW': int(os.getenv('OIDC_TOKEN_REFRESH_WINDOW', '300')),  # Refresh 5 min before expiry
+    'SESSION_MAX_AGE': int(os.getenv('OIDC_SESSION_MAX_AGE', '28800')),  # 8 hours
+    'JWKS_CACHE_TTL': int(os.getenv('OIDC_JWKS_CACHE_TTL', '3600')),  # 1 hour
+    # Key rotation settings
+    'KEY_ROTATION_CHECK_INTERVAL': int(os.getenv('OIDC_KEY_ROTATION_CHECK', '3600')),  # 1 hour
+    'ALLOW_ALGORITHM_RS256': True,
+    'ALLOW_ALGORITHM_RS384': True,
+    'ALLOW_ALGORITHM_RS512': True,
 }
+
+# Session security settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_NAME = 'securesys_session'
+SESSION_COOKIE_AGE = OIDC_AUTH['SESSION_MAX_AGE']
+SESSION_COOKIE_SECURE = IS_PRODUCTION
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Strict' if IS_PRODUCTION else 'Lax'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_SAVE_EVERY_REQUEST = True  # Extend session on activity
+
+# CSRF settings
+CSRF_COOKIE_SECURE = IS_PRODUCTION
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Strict' if IS_PRODUCTION else 'Lax'
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',') if os.getenv('CSRF_TRUSTED_ORIGINS') else []
 
 # Authentication providers (processed in order of priority)
 # Uses Strategy pattern - easily add new providers
@@ -318,3 +350,93 @@ OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://l
 # =============================================================================
 WEBHOOK_ENABLED = os.getenv('WEBHOOK_ENABLED', 'False').lower() == 'true'
 WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '')
+
+# =============================================================================
+# OpenAPI Documentation (drf-spectacular)
+# =============================================================================
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SecureSys Auditor API',
+    'DESCRIPTION': '''
+## Security Scanning & Vulnerability Management Platform
+
+SecureSys Auditor provides a comprehensive REST API for:
+
+- **Scan Management**: Submit, track, and retrieve security scan results
+- **Finding Analysis**: Query and analyze discovered vulnerabilities
+- **System Inventory**: Track monitored systems and their security posture
+- **Webhook Integration**: Real-time notifications for security events
+- **Report Generation**: Generate PDF reports for compliance and auditing
+
+### Authentication
+
+All API endpoints require authentication via:
+- **Bearer Token**: JWT tokens issued via `/api/v1/auth/token/`
+- **OIDC/Keycloak**: Enterprise SSO integration
+
+### Rate Limiting
+
+- Anonymous: 100 requests/hour
+- Authenticated: 1000 requests/hour
+- Scan submissions: 100/hour
+
+### Versioning
+
+The API uses URL-based versioning. Current version: `v1`
+''',
+    'VERSION': '2.0.0',
+    'CONTACT': {
+        'name': 'SecureSys Support',
+        'email': 'support@securesys.io',
+        'url': 'https://docs.securesys.io',
+    },
+    'LICENSE': {
+        'name': 'MIT',
+        'url': 'https://opensource.org/licenses/MIT',
+    },
+    'SERVERS': [
+        {'url': 'https://api.securesys.io', 'description': 'Production'},
+        {'url': 'https://staging-api.securesys.io', 'description': 'Staging'},
+        {'url': 'http://localhost:8000', 'description': 'Local Development'},
+    ],
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v[0-9]+',
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'filter': True,
+    },
+    'SWAGGER_UI_DIST': 'SIDECAR',  # Use swagger-ui-dist from npm
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
+    # Authentication schemes
+    'SECURITY': [
+        {'BearerAuth': []},
+    ],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'BearerAuth': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'JWT',
+                'description': 'JWT Bearer token authentication. Obtain tokens via POST /api/v1/auth/token/',
+            },
+        },
+    },
+    # Tags for grouping endpoints
+    'TAGS': [
+        {'name': 'Health', 'description': 'Health check and system status endpoints'},
+        {'name': 'Authentication', 'description': 'User authentication and token management'},
+        {'name': 'Scans', 'description': 'Security scan submission and retrieval'},
+        {'name': 'Systems', 'description': 'Monitored system inventory'},
+        {'name': 'Dashboard', 'description': 'Aggregated statistics and metrics'},
+        {'name': 'Webhooks', 'description': 'Webhook endpoint configuration'},
+        {'name': 'Reports', 'description': 'Report generation and download'},
+    ],
+    # Enum naming
+    'ENUM_NAME_OVERRIDES': {
+        'SeverityEnum': 'core.models.Finding.severity',
+        'ScanStatusEnum': 'core.models.ScanResult.status',
+    },
+}

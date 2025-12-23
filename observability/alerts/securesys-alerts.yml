@@ -1,0 +1,277 @@
+# SecureSys Auditor - Alerting Rules
+# Critical alerts for production monitoring
+
+groups:
+  # =============================================================================
+  # Application Health Alerts
+  # =============================================================================
+  - name: application_health
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          runbook_url: "https://docs.securesys.io/runbooks/high-error-rate"
+
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow API response time"
+          description: "95th percentile response time is {{ $value }}s (threshold: 2s)"
+
+      - alert: CriticalResponseTime
+        expr: |
+          histogram_quantile(0.99, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Critical API response time"
+          description: "99th percentile response time is {{ $value }}s (threshold: 5s)"
+
+      - alert: HealthCheckFailing
+        expr: up{job="securesys-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Backend health check failing"
+          description: "SecureSys backend is not responding to health checks"
+          runbook_url: "https://docs.securesys.io/runbooks/health-check-failing"
+
+  # =============================================================================
+  # Scan Processing Alerts
+  # =============================================================================
+  - name: scan_processing
+    interval: 30s
+    rules:
+      - alert: ScanProcessingBacklog
+        expr: |
+          sum(celery_task_queued_total{queue="scans"}) 
+          - sum(celery_task_received_total{queue="scans"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Scan processing backlog detected"
+          description: "{{ $value }} scans are queued and waiting to be processed"
+
+      - alert: ScanProcessingStalled
+        expr: |
+          rate(celery_task_succeeded_total{queue="scans"}[15m]) == 0
+          and
+          sum(celery_task_queued_total{queue="scans"}) > 0
+        for: 15m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Scan processing has stalled"
+          description: "No scans have been processed in the last 15 minutes"
+
+      - alert: HighScanFailureRate
+        expr: |
+          (
+            sum(rate(celery_task_failed_total{queue="scans"}[10m]))
+            /
+            sum(rate(celery_task_received_total{queue="scans"}[10m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "High scan failure rate"
+          description: "{{ $value | humanizePercentage }} of scans are failing"
+
+  # =============================================================================
+  # Webhook Delivery Alerts
+  # =============================================================================
+  - name: webhook_delivery
+    interval: 30s
+    rules:
+      - alert: WebhookDeliveryFailures
+        expr: |
+          sum(rate(webhook_delivery_failed_total[5m])) 
+          / 
+          sum(rate(webhook_delivery_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: integrations
+        annotations:
+          summary: "High webhook delivery failure rate"
+          description: "{{ $value | humanizePercentage }} of webhook deliveries are failing"
+
+      - alert: WebhookCircuitBreakerOpen
+        expr: webhook_circuit_breaker_open > 0
+        for: 1m
+        labels:
+          severity: warning
+          team: integrations
+        annotations:
+          summary: "Webhook circuit breaker is open"
+          description: "Circuit breaker is open for {{ $labels.endpoint }}"
+
+      - alert: WebhookDeadLetterQueueGrowing
+        expr: webhook_dlq_size > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: integrations
+        annotations:
+          summary: "Webhook dead letter queue is growing"
+          description: "{{ $value }} messages in dead letter queue"
+
+  # =============================================================================
+  # Database Alerts
+  # =============================================================================
+  - name: database
+    interval: 30s
+    rules:
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          pg_stat_activity_count{state="active"} 
+          / 
+          pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $value | humanizePercentage }} of database connections in use"
+
+      - alert: DatabaseSlowQueries
+        expr: |
+          rate(django_db_query_duration_seconds_sum[5m]) 
+          / 
+          rate(django_db_query_duration_seconds_count[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Slow database queries detected"
+          description: "Average query time is {{ $value }}s"
+
+      - alert: DatabaseBackupStale
+        expr: |
+          (time() - backup_last_success_timestamp) > 86400
+        for: 1h
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Database backup is stale"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+
+  # =============================================================================
+  # Infrastructure Alerts
+  # =============================================================================
+  - name: infrastructure
+    interval: 30s
+    rules:
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Disk space critically low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is not responding"
+
+  # =============================================================================
+  # SLO Alerts (Error Budget)
+  # =============================================================================
+  - name: slo_alerts
+    interval: 1m
+    rules:
+      # 99.9% availability SLO (43 minutes/month downtime budget)
+      - alert: SLOBudgetBurnRateHigh
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total[1h]))
+          ) > (1 - 0.999) * 14.4
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          slo: availability
+        annotations:
+          summary: "High SLO budget burn rate"
+          description: "Error budget is being consumed at {{ $value | humanizePercentage }} rate"
+
+      # P95 latency SLO: 95% of requests under 500ms
+      - alert: LatencySLOViolation
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[10m])) by (le)
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          slo: latency
+        annotations:
+          summary: "Latency SLO violation"
+          description: "P95 latency is {{ $value }}s (SLO: 500ms)"

@@ -1,0 +1,49 @@
+# Prometheus Configuration for SecureSys Auditor
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'securesys-auditor'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # OpenTelemetry Collector metrics
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+
+  # Django application metrics (via OTEL collector)
+  - job_name: 'securesys-backend'
+    static_configs:
+      - targets: ['otel-collector:8889']
+    relabel_configs:
+      - source_labels: [__name__]
+        regex: 'target_info|http_.*|django_.*|celery_.*'
+        action: keep
+
+  # Redis metrics (if using redis-exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # PostgreSQL metrics (if using postgres-exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']

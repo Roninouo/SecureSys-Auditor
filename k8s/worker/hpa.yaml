@@ -1,0 +1,65 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: securesys-worker
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: securesys-worker
+  
+  minReplicas: 2
+  maxReplicas: 20
+  
+  metrics:
+    # Scale on CPU - workers are CPU-bound during scan processing
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    
+    # Scale on memory
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+    
+    # Custom metric: Celery queue depth (requires Prometheus adapter)
+    # Uncomment if you have prometheus-adapter configured
+    # - type: External
+    #   external:
+    #     metric:
+    #       name: celery_queue_length
+    #       selector:
+    #         matchLabels:
+    #           queue: scans
+    #     target:
+    #       type: Value
+    #       value: "10"
+  
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 600  # Wait 10 minutes - workers may have long tasks
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120  # Remove 1 pod every 2 minutes max
+    
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Pods
+          value: 4
+          periodSeconds: 30  # Add up to 4 pods every 30 seconds for burst handling
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+      selectPolicy: Max

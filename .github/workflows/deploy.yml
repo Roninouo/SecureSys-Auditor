@@ -1,0 +1,494 @@
+name: Production Deploy with Canary
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  workflow_dispatch:
+    inputs:
+      skip_canary:
+        description: 'Skip canary deployment (emergency)'
+        required: false
+        default: 'false'
+      rollback_to:
+        description: 'Rollback to specific version (leave empty for normal deploy)'
+        required: false
+        default: ''
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  CANARY_PERCENTAGE: 10
+  CANARY_DURATION: 900  # 15 minutes
+
+jobs:
+  # =============================================================================
+  # Build and Test
+  # =============================================================================
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION=$(date +%Y%m%d)-${GITHUB_SHA::8}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Generated version: ${VERSION}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
+
+  # =============================================================================
+  # Database Migration (Staging)
+  # =============================================================================
+  migrate-staging:
+    name: Migrate Staging Database
+    runs-on: ubuntu-latest
+    needs: build
+    environment: staging
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r reqs/requirements-base.txt
+
+      - name: Create database backup
+        env:
+          DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+        run: |
+          PGPASSWORD=$DB_PASSWORD pg_dump \
+            -h $DB_HOST \
+            -U $DB_USER \
+            -d $DB_NAME \
+            --format=custom \
+            -f staging_backup_$(date +%Y%m%d_%H%M%S).dump
+          echo "Backup created successfully"
+
+      - name: Run migrations (dry-run)
+        working-directory: src/backend
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.STAGING_DJANGO_SECRET_KEY }}
+          DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+        run: |
+          python manage.py migrate --plan
+          python manage.py migrate_scanning_data --dry-run
+
+      - name: Apply migrations
+        working-directory: src/backend
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.STAGING_DJANGO_SECRET_KEY }}
+          DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          DB_USER: ${{ secrets.STAGING_DB_USER }}
+          DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+        run: |
+          python manage.py migrate --no-input
+          python manage.py migrate_scanning_data --backup --verify
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-db-backup
+          path: staging_backup_*.dump
+          retention-days: 7
+
+  # =============================================================================
+  # Canary Deployment
+  # =============================================================================
+  canary-deploy:
+    name: Canary Deployment
+    runs-on: ubuntu-latest
+    needs: [build, migrate-staging]
+    environment: production-canary
+    if: ${{ github.event.inputs.skip_canary != 'true' && github.event.inputs.rollback_to == '' }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Deploy canary
+        run: |
+          echo "Deploying canary with ${{ env.CANARY_PERCENTAGE }}% traffic..."
+          
+          # Update canary deployment
+          kubectl set image deployment/securesys-backend-canary \
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
+            -n securesys
+          
+          # Wait for rollout
+          kubectl rollout status deployment/securesys-backend-canary \
+            -n securesys \
+            --timeout=300s
+
+      - name: Configure traffic split
+        run: |
+          # Using Istio VirtualService for traffic splitting
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.istio.io/v1beta1
+          kind: VirtualService
+          metadata:
+            name: securesys-backend
+            namespace: securesys
+          spec:
+            hosts:
+              - api.securesys.io
+            http:
+              - route:
+                  - destination:
+                      host: securesys-backend
+                      port:
+                        number: 8000
+                    weight: $(( 100 - ${{ env.CANARY_PERCENTAGE }} ))
+                  - destination:
+                      host: securesys-backend-canary
+                      port:
+                        number: 8000
+                    weight: ${{ env.CANARY_PERCENTAGE }}
+          EOF
+
+      - name: Wait for canary evaluation period
+        run: |
+          echo "Waiting ${{ env.CANARY_DURATION }} seconds for canary evaluation..."
+          sleep ${{ env.CANARY_DURATION }}
+
+      - name: Check canary health
+        id: canary_health
+        run: |
+          # Check error rate for canary
+          ERROR_RATE=$(curl -s "http://prometheus.securesys.io/api/v1/query" \
+            --data-urlencode 'query=sum(rate(http_requests_total{deployment="canary",status=~"5.."}[5m])) / sum(rate(http_requests_total{deployment="canary"}[5m]))' \
+            | jq -r '.data.result[0].value[1] // 0')
+          
+          echo "Canary error rate: ${ERROR_RATE}"
+          
+          # Check latency P95
+          LATENCY=$(curl -s "http://prometheus.securesys.io/api/v1/query" \
+            --data-urlencode 'query=histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{deployment="canary"}[5m])) by (le))' \
+            | jq -r '.data.result[0].value[1] // 0')
+          
+          echo "Canary P95 latency: ${LATENCY}s"
+          
+          # Fail if error rate > 5% or latency > 2s
+          if (( $(echo "$ERROR_RATE > 0.05" | bc -l) )); then
+            echo "❌ Canary failed: High error rate (${ERROR_RATE})"
+            echo "canary_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          if (( $(echo "$LATENCY > 2" | bc -l) )); then
+            echo "❌ Canary failed: High latency (${LATENCY}s)"
+            echo "canary_passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "✅ Canary passed all health checks"
+          echo "canary_passed=true" >> $GITHUB_OUTPUT
+
+      - name: Notify on canary failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "channel": "#securesys-deployments",
+              "text": "🚨 Canary deployment failed!",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {"title": "Version", "value": "${{ needs.build.outputs.version }}", "short": true},
+                    {"title": "Status", "value": "Automatic rollback initiated", "short": true}
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # =============================================================================
+  # Full Production Deployment
+  # =============================================================================
+  production-deploy:
+    name: Production Deployment
+    runs-on: ubuntu-latest
+    needs: [build, canary-deploy]
+    environment: production
+    if: ${{ always() && (needs.canary-deploy.result == 'success' || github.event.inputs.skip_canary == 'true') }}
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Create database backup before deploy
+        run: |
+          kubectl exec -n securesys deployment/securesys-postgres-backup -- \
+            /usr/local/bin/db-backup.sh
+          echo "Pre-deployment backup created"
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying version ${{ needs.build.outputs.version }} to production..."
+          
+          # Update main deployment
+          kubectl set image deployment/securesys-backend \
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
+            -n securesys
+          
+          kubectl set image deployment/securesys-celery-scans \
+            worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
+            -n securesys
+          
+          kubectl set image deployment/securesys-celery-webhooks \
+            worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.version }} \
+            -n securesys
+          
+          # Wait for rollouts
+          kubectl rollout status deployment/securesys-backend -n securesys --timeout=300s
+          kubectl rollout status deployment/securesys-celery-scans -n securesys --timeout=300s
+          kubectl rollout status deployment/securesys-celery-webhooks -n securesys --timeout=300s
+
+      - name: Remove traffic split (100% to new version)
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: networking.istio.io/v1beta1
+          kind: VirtualService
+          metadata:
+            name: securesys-backend
+            namespace: securesys
+          spec:
+            hosts:
+              - api.securesys.io
+            http:
+              - route:
+                  - destination:
+                      host: securesys-backend
+                      port:
+                        number: 8000
+                    weight: 100
+          EOF
+
+      - name: Run smoke tests
+        run: |
+          # Health check
+          curl -f https://api.securesys.io/api/v1/health/ || exit 1
+          
+          # Version check
+          VERSION=$(curl -s https://api.securesys.io/api/v1/health/ | jq -r '.version')
+          echo "Deployed version: ${VERSION}"
+
+      - name: Notify deployment success
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "channel": "#securesys-deployments",
+              "text": "✅ Production deployment successful!",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    {"title": "Version", "value": "${{ needs.build.outputs.version }}", "short": true},
+                    {"title": "Commit", "value": "${{ github.sha }}", "short": true}
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # =============================================================================
+  # Rollback Job
+  # =============================================================================
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.rollback_to != '' }}
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Rollback to previous version
+        run: |
+          VERSION="${{ github.event.inputs.rollback_to }}"
+          echo "Rolling back to version: ${VERSION}"
+          
+          # Rollback deployments
+          kubectl set image deployment/securesys-backend \
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -n securesys
+          
+          kubectl set image deployment/securesys-celery-scans \
+            worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -n securesys
+          
+          kubectl set image deployment/securesys-celery-webhooks \
+            worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION} \
+            -n securesys
+          
+          # Wait for rollouts
+          kubectl rollout status deployment/securesys-backend -n securesys --timeout=300s
+
+      - name: Verify rollback
+        run: |
+          curl -f https://api.securesys.io/api/v1/health/ || exit 1
+          echo "✅ Rollback completed successfully"
+
+      - name: Notify rollback
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "channel": "#securesys-deployments",
+              "text": "⚠️ Production rollback executed",
+              "attachments": [
+                {
+                  "color": "warning",
+                  "fields": [
+                    {"title": "Rolled back to", "value": "${{ github.event.inputs.rollback_to }}", "short": true},
+                    {"title": "Initiated by", "value": "${{ github.actor }}", "short": true}
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # =============================================================================
+  # Automatic Rollback on Failure
+  # =============================================================================
+  auto-rollback:
+    name: Auto Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [build, production-deploy]
+    if: failure()
+    environment: production
+    
+    steps:
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+
+      - name: Auto rollback
+        run: |
+          echo "🚨 Auto-rolling back due to deployment failure..."
+          
+          kubectl rollout undo deployment/securesys-backend -n securesys
+          kubectl rollout undo deployment/securesys-celery-scans -n securesys
+          kubectl rollout undo deployment/securesys-celery-webhooks -n securesys
+          
+          kubectl rollout status deployment/securesys-backend -n securesys --timeout=300s
+
+      - name: Restore database if needed
+        run: |
+          # Get latest backup
+          LATEST_BACKUP=$(kubectl exec -n securesys deployment/securesys-postgres-backup -- \
+            ls -t /backups/securesys_backup_*.sql.gz | head -1)
+          
+          echo "Latest backup available: ${LATEST_BACKUP}"
+          echo "Database rollback may be required - check migration status"
+
+      - name: Notify auto-rollback
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "channel": "#securesys-critical-alerts",
+              "text": "🚨 AUTOMATIC ROLLBACK EXECUTED",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    {"title": "Failed Version", "value": "${{ needs.build.outputs.version }}", "short": true},
+                    {"title": "Action", "value": "Automatic rollback to previous version", "short": true}
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

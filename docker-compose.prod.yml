@@ -1,0 +1,355 @@
+# SecureSys Auditor - Production Docker Compose
+# Includes: TLS termination, Prometheus, Grafana, automated backups
+
+version: '3.9'
+
+services:
+  # =============================================================================
+  # NGINX Reverse Proxy with TLS
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: securesys-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - securesys-prod
+
+  # =============================================================================
+  # PostgreSQL Database with Automated Backups
+  # =============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: securesys-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups/postgres:/backups
+      - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - securesys-prod
+
+  # PostgreSQL Backup Sidecar
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: securesys-postgres-backup
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USER}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_NAME}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./backups/postgres:/backups
+      - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Starting backup scheduler..."
+        # Run backup every 6 hours
+        while true; do
+          /usr/local/bin/db-backup.sh
+          sleep 21600
+        done
+    networks:
+      - securesys-prod
+
+  # =============================================================================
+  # Redis with Persistence
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: securesys-redis-prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - securesys-prod
+
+  # =============================================================================
+  # Django Backend API
+  # =============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: securesys-backend-prod
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      # Security
+      - SECURE_SSL_REDIRECT=True
+      - SECURE_HSTS_SECONDS=31536000
+      - SECURE_HSTS_INCLUDE_SUBDOMAINS=True
+      - SECURE_HSTS_PRELOAD=True
+      - SESSION_COOKIE_SECURE=True
+      - CSRF_COOKIE_SECURE=True
+      # OIDC
+      - OIDC_ENABLED=${OIDC_ENABLED:-true}
+      - OIDC_ISSUER=${OIDC_ISSUER}
+      - OIDC_AUDIENCE=${OIDC_AUDIENCE}
+      # Observability
+      - OTEL_ENABLED=True
+      - OTEL_SERVICE_NAME=securesys-backend
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SAMPLING_RATE=${OTEL_SAMPLING_RATE:-0.1}
+      # Webhooks
+      - WEBHOOK_ENABLED=${WEBHOOK_ENABLED:-true}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    expose:
+      - "8000"
+    volumes:
+      - backend_static:/app/staticfiles
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8000 --workers 4 --threads 2 --worker-class gthread --timeout 120 backend.wsgi:application"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - securesys-prod
+
+  # =============================================================================
+  # Celery Workers
+  # =============================================================================
+  celery-worker-scans:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: securesys-celery-scans-prod
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - OTEL_ENABLED=True
+      - OTEL_SERVICE_NAME=securesys-celery-scans
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    volumes:
+      - backend_logs:/app/logs
+    command: celery -A backend worker --loglevel=info --queues=scans --concurrency=4
+    networks:
+      - securesys-prod
+
+  celery-worker-webhooks:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: securesys-celery-webhooks-prod
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - OTEL_ENABLED=True
+      - OTEL_SERVICE_NAME=securesys-celery-webhooks
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    volumes:
+      - backend_logs:/app/logs
+    command: celery -A backend worker --loglevel=info --queues=webhooks --concurrency=2
+    networks:
+      - securesys-prod
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: securesys-celery-beat-prod
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+    command: celery -A backend beat --loglevel=info
+    networks:
+      - securesys-prod
+
+  # =============================================================================
+  # Observability Stack
+  # =============================================================================
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.91.0
+    container_name: securesys-otel-collector
+    restart: always
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics
+    networks:
+      - securesys-prod
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: securesys-prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - securesys-prod
+
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: securesys-alertmanager
+    restart: always
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - securesys-prod
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: securesys-grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/grafana:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - securesys-prod
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: securesys-jaeger
+    restart: always
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+    networks:
+      - securesys-prod
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_static:
+    driver: local
+  backend_media:
+    driver: local
+  backend_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  securesys-prod:
+    name: securesys-production
+    driver: bridge

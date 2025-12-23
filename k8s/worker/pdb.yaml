@@ -1,0 +1,14 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: securesys-worker-pdb
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+    app.kubernetes.io/component: worker
+spec:
+  # Always keep at least 1 worker running
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: securesys-worker

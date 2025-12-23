@@ -112,6 +112,7 @@ class WebhookDelivery(models.Model):
         SUCCESS = 'success', 'Success'
         FAILED = 'failed', 'Failed'
         SKIPPED = 'skipped', 'Skipped'
+        DLQ = 'dlq', 'Dead Letter Queue'  # For failed deliveries that exhausted retries
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     endpoint = models.ForeignKey(
@@ -121,6 +122,15 @@ class WebhookDelivery(models.Model):
     )
     event_type = models.CharField(max_length=100, db_index=True)
     payload = models.JSONField(default=dict)
+    
+    # Idempotency key to prevent duplicate processing
+    idempotency_key = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text='Unique key to prevent duplicate webhook processing'
+    )
     
     status = models.CharField(
         max_length=20,
@@ -132,9 +142,20 @@ class WebhookDelivery(models.Model):
     error_message = models.TextField(blank=True)
     
     attempt_count = models.IntegerField(default=0)
+    max_attempts = models.IntegerField(default=5)  # Move to DLQ after this many attempts
+    next_retry_at = models.DateTimeField(null=True, blank=True)
+    
+    # Delivery SLA tracking
+    sla_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Deadline for successful delivery (for SLA reporting)'
+    )
+    sla_met = models.BooleanField(null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    moved_to_dlq_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'webhook_deliveries'
@@ -145,7 +166,86 @@ class WebhookDelivery(models.Model):
             models.Index(fields=['event_type']),
             models.Index(fields=['status']),
             models.Index(fields=['created_at']),
+            models.Index(fields=['idempotency_key']),
+            models.Index(fields=['next_retry_at']),
+            models.Index(fields=['sla_deadline']),
         ]
     
     def __str__(self):
         return f"{self.event_type} -> {self.endpoint.name} ({self.status})"
+    
+    def move_to_dlq(self):
+        """Move delivery to dead letter queue after max attempts."""
+        self.status = self.Status.DLQ
+        self.moved_to_dlq_at = timezone.now()
+        self.save(update_fields=['status', 'moved_to_dlq_at', 'updated_at'])
+    
+    def check_sla(self) -> bool:
+        """Check if delivery met SLA deadline."""
+        if self.sla_deadline and self.delivered_at:
+            self.sla_met = self.delivered_at <= self.sla_deadline
+            self.save(update_fields=['sla_met'])
+            return self.sla_met
+        return True
+
+
+class DeadLetterQueue(models.Model):
+    """
+    Dead Letter Queue for failed webhook deliveries.
+    Stores failed deliveries for manual review and reprocessing.
+    """
+    
+    class Reason(models.TextChoices):
+        MAX_RETRIES = 'max_retries', 'Maximum retries exceeded'
+        CIRCUIT_BREAKER = 'circuit_breaker', 'Circuit breaker open'
+        INVALID_ENDPOINT = 'invalid_endpoint', 'Invalid endpoint'
+        PAYLOAD_ERROR = 'payload_error', 'Payload serialization error'
+        TIMEOUT = 'timeout', 'Request timeout'
+        OTHER = 'other', 'Other'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    original_delivery = models.OneToOneField(
+        WebhookDelivery,
+        on_delete=models.CASCADE,
+        related_name='dlq_entry'
+    )
+    reason = models.CharField(
+        max_length=50,
+        choices=Reason.choices,
+        default=Reason.OTHER
+    )
+    error_details = models.TextField(blank=True)
+    
+    # For reprocessing
+    reprocessed = models.BooleanField(default=False)
+    reprocessed_at = models.DateTimeField(null=True, blank=True)
+    reprocess_result = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'webhook_dead_letter_queue'
+        verbose_name = 'dead letter entry'
+        verbose_name_plural = 'dead letter entries'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"DLQ: {self.original_delivery.event_type} ({self.reason})"
+    
+    def reprocess(self):
+        """Attempt to reprocess the failed delivery."""
+        from .services import get_webhook_service
+        
+        service = get_webhook_service()
+        result = service.deliver(
+            self.original_delivery.endpoint,
+            self.original_delivery.event_type,
+            self.original_delivery.payload
+        )
+        
+        self.reprocessed = True
+        self.reprocessed_at = timezone.now()
+        self.reprocess_result = 'success' if result.success else f'failed: {result.error}'
+        self.save()
+        
+        return result

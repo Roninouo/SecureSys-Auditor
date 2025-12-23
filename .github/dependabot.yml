@@ -1,0 +1,99 @@
+# Dependabot Configuration
+# Automated dependency updates for security and maintenance
+
+version: 2
+updates:
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/reqs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "security-team"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "deps(python)"
+    groups:
+      # Group minor/patch updates together
+      python-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    # Ignore major version updates for critical packages (manual review required)
+    ignore:
+      - dependency-name: "django"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "celery"
+        update-types: ["version-update:semver-major"]
+
+  # npm dependencies for frontend
+  - package-ecosystem: "npm"
+    directory: "/src/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "frontend-team"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "deps(npm)"
+    groups:
+      # Group React ecosystem updates
+      react:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      # Group dev dependencies
+      dev-deps:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "deps(docker)"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    reviewers:
+      - "devops-team"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "deps(actions)"
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -8,6 +8,9 @@ URL Structure:
 - /api/v1/scanning/         Scanning endpoints (new modular app)
 - /api/v1/scans/.../report/ Report generation (new modular reports app)
 - /api/v1/webhooks/         Webhook management (new modular webhooks app)
+- /api/docs/                OpenAPI documentation (Swagger UI)
+- /api/redoc/               OpenAPI documentation (ReDoc)
+- /api/schema/              OpenAPI schema (JSON/YAML)
 - /health/                  Health check endpoints (K8s compatible)
 """
 from django.contrib import admin
@@ -21,6 +24,9 @@ urlpatterns = [
     
     # Health checks (outside /api/v1/ for load balancer compatibility)
     path('health/', include('observability.urls')),
+    
+    # API Documentation - always available
+    path('api/', include('backend.api_docs')),
     
     # API v1 - Core routes (legacy, being refactored)
     path('api/v1/', include('core.urls')),

@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: securesys-backend
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: securesys-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: securesys-backend
+        app.kubernetes.io/name: securesys-auditor
+        app.kubernetes.io/component: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/health/metrics/"
+    spec:
+      serviceAccountName: securesys-backend
+      terminationGracePeriodSeconds: 30
+      
+      # Pod security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      
+      # Anti-affinity: spread pods across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: securesys-backend
+                topologyKey: kubernetes.io/hostname
+      
+      # Init container for migrations
+      initContainers:
+        - name: migrate
+          image: securesys/backend:latest
+          imagePullPolicy: Always
+          command: ["python", "manage.py", "migrate", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: securesys-config
+            - secretRef:
+                name: securesys-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      
+      containers:
+        - name: backend
+          image: securesys/backend:latest
+          imagePullPolicy: Always
+          
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          
+          # Environment variables
+          envFrom:
+            - configMapRef:
+                name: securesys-config
+            - secretRef:
+                name: securesys-secrets
+          
+          # Resource limits
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          
+          # Container security
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts for writable directories
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+            - name: static
+              mountPath: /app/staticfiles
+          
+          # Probes
+          livenessProbe:
+            httpGet:
+              path: /health/live/
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          readinessProbe:
+            httpGet:
+              path: /health/ready/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          
+          startupProbe:
+            httpGet:
+              path: /health/live/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          
+          # Lifecycle hooks
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
+      
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+        - name: static
+          emptyDir: {}
+      
+      # Topology spread for HA
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: securesys-backend

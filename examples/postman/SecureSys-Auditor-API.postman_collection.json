@@ -1,0 +1,390 @@
+{
+	"info": {
+		"name": "SecureSys Auditor API",
+		"description": "API collection for SecureSys Auditor - Security scanning and vulnerability management platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"version": "2.0.0"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{api_key}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://api.securesys.io",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "your-api-key-here",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Health & Status",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health", ""]
+						},
+						"description": "Check API health status. Returns version and status information."
+					}
+				}
+			]
+		},
+		{
+			"name": "Scans",
+			"item": [
+				{
+					"name": "Submit Scan",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"hostname\": \"webserver-01.example.com\",\n    \"scan_type\": \"vulnerability\",\n    \"agent_version\": \"2.0.0\",\n    \"started_at\": \"{{$isoTimestamp}}\",\n    \"completed_at\": \"{{$isoTimestamp}}\",\n    \"findings\": [\n        {\n            \"title\": \"CVE-2023-1234 - Remote Code Execution\",\n            \"severity\": \"critical\",\n            \"description\": \"A remote code execution vulnerability was found in the application server.\",\n            \"recommendation\": \"Update to version 2.0.1 or later.\",\n            \"affected_component\": \"/usr/local/bin/appserver\",\n            \"cve_id\": \"CVE-2023-1234\"\n        },\n        {\n            \"title\": \"Missing Security Headers\",\n            \"severity\": \"medium\",\n            \"description\": \"The server is missing important security headers.\",\n            \"recommendation\": \"Configure HSTS, X-Content-Type-Options, and X-Frame-Options headers.\",\n            \"affected_component\": \"nginx\"\n        }\n    ],\n    \"metadata\": {\n        \"os\": \"Ubuntu 22.04\",\n        \"kernel\": \"5.15.0-generic\",\n        \"agent_id\": \"agent-001\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/scans/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "scans", ""]
+						},
+						"description": "Submit a new security scan with findings."
+					}
+				},
+				{
+					"name": "List Scans",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/scans/?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "scans", ""],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								},
+								{
+									"key": "hostname",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "status",
+									"value": "completed",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List all scans with pagination and optional filtering."
+					}
+				},
+				{
+					"name": "Get Scan Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/scans/:scan_id/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "scans", ":scan_id", ""],
+							"variable": [
+								{
+									"key": "scan_id",
+									"value": "{{scan_id}}",
+									"description": "UUID of the scan"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific scan."
+					}
+				},
+				{
+					"name": "Get Scan Findings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/scans/:scan_id/findings/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "scans", ":scan_id", "findings", ""],
+							"variable": [
+								{
+									"key": "scan_id",
+									"value": "{{scan_id}}"
+								}
+							]
+						},
+						"description": "Get all findings for a specific scan."
+					}
+				}
+			]
+		},
+		{
+			"name": "Systems",
+			"item": [
+				{
+					"name": "List Systems",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/systems/?page=1&page_size=20",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "systems", ""],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "page_size",
+									"value": "20"
+								}
+							]
+						},
+						"description": "List all monitored systems."
+					}
+				},
+				{
+					"name": "Get System Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/systems/:system_id/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "systems", ":system_id", ""],
+							"variable": [
+								{
+									"key": "system_id",
+									"value": "{{system_id}}"
+								}
+							]
+						},
+						"description": "Get detailed information about a specific system."
+					}
+				}
+			]
+		},
+		{
+			"name": "Dashboard",
+			"item": [
+				{
+					"name": "Get Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/dashboard/stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "dashboard", "stats", ""]
+						},
+						"description": "Get aggregated dashboard statistics."
+					}
+				},
+				{
+					"name": "Get Severity Breakdown",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/dashboard/severity-breakdown/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "dashboard", "severity-breakdown", ""]
+						},
+						"description": "Get breakdown of findings by severity."
+					}
+				},
+				{
+					"name": "Get Recent Activity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/dashboard/recent-activity/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "dashboard", "recent-activity", ""]
+						},
+						"description": "Get recent activity feed."
+					}
+				}
+			]
+		},
+		{
+			"name": "Webhooks",
+			"item": [
+				{
+					"name": "List Webhooks",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/webhooks/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "webhooks", ""]
+						},
+						"description": "List all configured webhook endpoints."
+					}
+				},
+				{
+					"name": "Create Webhook",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"SIEM Integration\",\n    \"url\": \"https://siem.example.com/webhook/securesys\",\n    \"event_types\": [\n        \"scan.completed\",\n        \"finding.critical\"\n    ],\n    \"secret\": \"your-webhook-secret\",\n    \"headers\": {\n        \"X-Custom-Header\": \"value\"\n    }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/webhooks/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "webhooks", ""]
+						},
+						"description": "Create a new webhook endpoint."
+					}
+				},
+				{
+					"name": "Get Webhook Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/webhooks/stats/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "webhooks", "stats", ""]
+						},
+						"description": "Get webhook delivery statistics."
+					}
+				},
+				{
+					"name": "Test Webhook",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/webhooks/:webhook_id/test/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "webhooks", ":webhook_id", "test", ""],
+							"variable": [
+								{
+									"key": "webhook_id",
+									"value": "{{webhook_id}}"
+								}
+							]
+						},
+						"description": "Send a test event to a webhook endpoint."
+					}
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"item": [
+				{
+					"name": "Generate Report",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"scan_id\": \"{{scan_id}}\",\n    \"format\": \"pdf\",\n    \"include_recommendations\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/reports/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "reports", ""]
+						},
+						"description": "Generate a PDF report for a scan."
+					}
+				},
+				{
+					"name": "Download Report",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/reports/:report_id/download/",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "reports", ":report_id", "download", ""],
+							"variable": [
+								{
+									"key": "report_id",
+									"value": "{{report_id}}"
+								}
+							]
+						},
+						"description": "Download a generated report."
+					}
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set current timestamp for requests that need it",
+					"pm.variables.set('timestamp', new Date().toISOString());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Common response tests",
+					"pm.test('Response time is less than 2000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(2000);",
+					"});",
+					"",
+					"// Store scan_id from POST /scans/ response",
+					"if (pm.request.url.getPath().endsWith('/scans/') && pm.request.method === 'POST') {",
+					"    var jsonData = pm.response.json();",
+					"    if (jsonData.id) {",
+					"        pm.collectionVariables.set('scan_id', jsonData.id);",
+					"    }",
+					"}"
+				]
+			}
+		}
+	]
+}

@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: securesys
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: securesys-auditor
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  # Base resources
+  - base/namespace.yaml
+  - base/configmap.yaml
+  - base/service-account.yaml
+  
+  # Backend API
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - backend/hpa.yaml
+  - backend/pdb.yaml
+  
+  # Celery workers
+  - worker/deployment.yaml
+  - worker/hpa.yaml
+  - worker/pdb.yaml
+  
+  # Ingress
+  - ingress/ingress.yaml
+  - ingress/certificate.yaml
+  
+  # Monitoring
+  - monitoring/service-monitor.yaml
+
+# Image configuration - update tags here
+images:
+  - name: securesys/backend
+    newTag: v2.0.0
+  - name: securesys/frontend
+    newTag: v2.0.0
+
+# Patches for environment-specific configuration
+patches: []
+
+# Config and secret generators
+configMapGenerator: []
+secretGenerator: []

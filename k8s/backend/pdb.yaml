@@ -1,0 +1,14 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: securesys-backend-pdb
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+    app.kubernetes.io/component: backend
+spec:
+  # Ensure at least 2 pods are always running during voluntary disruptions
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: securesys-backend

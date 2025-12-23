@@ -1,0 +1,124 @@
+# OpenTelemetry Collector Configuration
+# Handles trace sampling, metrics aggregation, and export
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # Batch processor for efficient export
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Tail-based sampling for traces
+  # Keeps all error traces and samples successful ones
+  tail_sampling:
+    decision_wait: 30s
+    num_traces: 100000
+    expected_new_traces_per_sec: 1000
+    policies:
+      # Always sample errors
+      - name: errors-policy
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      # Always sample slow requests (>2s)
+      - name: latency-policy
+        type: latency
+        latency:
+          threshold_ms: 2000
+      # Sample 10% of other traces
+      - name: probabilistic-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
+
+  # Resource attributes
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "${ENVIRONMENT:-production}"
+        action: upsert
+      - key: service.namespace
+        value: securesys
+        action: upsert
+
+  # Filter out health check spans
+  filter:
+    spans:
+      exclude:
+        match_type: strict
+        attributes:
+          - key: http.route
+            value: /api/v1/health/
+          - key: http.route
+            value: /health/
+          - key: http.route
+            value: /healthz/
+
+exporters:
+  # Jaeger for trace visualization
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Prometheus for metrics
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: securesys
+    send_timestamps: true
+    metric_expiration: 180m
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Debug logging (disable in production)
+  logging:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, zpages]
+  
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter, tail_sampling, resource, batch]
+      exporters: [otlp/jaeger]
+    
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus]
+    
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [logging]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888

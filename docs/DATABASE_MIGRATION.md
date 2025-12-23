@@ -317,3 +317,222 @@ Backups are stored in:
 - [ ] Verify production data
 - [ ] Monitor for 24 hours
 - [ ] Archive migration artifacts
+---
+
+## Automated Database Backups & Retention
+
+### Overview
+
+SecureSys Auditor uses automated database backups with configurable retention policies. Backups are created every 6 hours and stored in compressed format.
+
+### Backup Configuration
+
+| Environment | Frequency | Retention | Storage Location |
+|------------|-----------|-----------|------------------|
+| **Development** | Manual | 7 days | Local `./backups/` |
+| **Staging** | Every 6 hours | 30 days | `./backups/` + S3 |
+| **Production** | Every 6 hours | 90 days | S3 + Cross-region replication |
+
+### Backup Scripts
+
+Two scripts manage database backups:
+
+1. **`scripts/db-backup.sh`** - Creates automated backups
+2. **`scripts/db-restore.sh`** - Restores from backup files
+
+### Running Manual Backups
+
+```bash
+# Development (local)
+docker exec securesys-postgres pg_dump -U securesys_user securesys_db > backup.sql
+
+# Production (via backup container)
+docker exec securesys-postgres-backup /usr/local/bin/db-backup.sh
+```
+
+### Automated Backup Process
+
+The `postgres-backup` sidecar container runs `db-backup.sh` every 6 hours:
+
+```yaml
+# docker-compose.prod.yml
+postgres-backup:
+  image: postgres:15-alpine
+  environment:
+    BACKUP_RETENTION_DAYS: 30
+  volumes:
+    - ./backups/postgres:/backups
+    - ./scripts/db-backup.sh:/usr/local/bin/db-backup.sh:ro
+```
+
+### Backup File Format
+
+Backups are stored as compressed PostgreSQL custom format:
+
+```
+backups/postgres/securesys_backup_YYYYMMDD_HHMMSS.sql.gz
+```
+
+Example:
+```
+securesys_backup_20231223_143022.sql.gz
+securesys_backup_20231223_203022.sql.gz
+```
+
+### Retention Policy
+
+Old backups are automatically deleted based on `BACKUP_RETENTION_DAYS`:
+
+```bash
+# In db-backup.sh
+find "${BACKUP_DIR}" -name "securesys_backup_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
+```
+
+### Restore Procedures
+
+#### Quick Restore (from Docker)
+
+```bash
+# List available backups
+ls -la backups/postgres/
+
+# Restore from specific backup
+docker exec -it securesys-postgres-backup \
+  /scripts/db-restore.sh /backups/securesys_backup_20231223_143022.sql.gz
+```
+
+#### Manual Restore
+
+```bash
+# Stop application
+docker-compose -f docker-compose.prod.yml stop backend celery-worker-scans celery-worker-webhooks
+
+# Restore database
+gunzip -c backup.sql.gz | docker exec -i securesys-postgres-prod \
+  psql -U securesys_user -d securesys_db
+
+# Restart application
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+#### Point-in-Time Recovery (Production)
+
+For production environments with WAL archiving enabled:
+
+```bash
+# 1. Stop PostgreSQL
+docker-compose -f docker-compose.prod.yml stop postgres
+
+# 2. Configure recovery target
+cat > recovery.conf << EOF
+restore_command = 'cp /backups/wal/%f %p'
+recovery_target_time = '2023-12-23 14:30:00'
+EOF
+
+# 3. Start PostgreSQL in recovery mode
+docker-compose -f docker-compose.prod.yml up -d postgres
+```
+
+### Testing Restores
+
+**Monthly restore tests are required** to ensure backup integrity:
+
+```bash
+# 1. Create test database
+docker exec securesys-postgres-prod \
+  psql -U securesys_user -c "CREATE DATABASE restore_test;"
+
+# 2. Restore to test database
+docker exec securesys-postgres-backup \
+  /scripts/db-restore.sh /backups/latest.sql.gz --database=restore_test
+
+# 3. Verify record counts
+docker exec securesys-postgres-prod \
+  psql -U securesys_user -d restore_test \
+  -c "SELECT 'systems' as table, COUNT(*) FROM scanning_systems
+      UNION ALL
+      SELECT 'scans', COUNT(*) FROM scanning_scans
+      UNION ALL
+      SELECT 'findings', COUNT(*) FROM scanning_findings;"
+
+# 4. Cleanup
+docker exec securesys-postgres-prod \
+  psql -U securesys_user -c "DROP DATABASE restore_test;"
+```
+
+### Backup Monitoring
+
+Prometheus metrics track backup status:
+
+```yaml
+# Alert if backup is stale (>24 hours old)
+- alert: DatabaseBackupStale
+  expr: (time() - backup_last_success_timestamp) > 86400
+  for: 1h
+  labels:
+    severity: critical
+```
+
+### Cloud Backup Integration (Production)
+
+For production environments, backups are also synced to cloud storage:
+
+#### AWS S3
+
+```bash
+# Add to backup script
+aws s3 cp "${BACKUP_FILE}" "s3://${BACKUP_BUCKET}/postgres/${BACKUP_FILE##*/}"
+
+# Enable versioning for point-in-time recovery
+aws s3api put-bucket-versioning \
+  --bucket ${BACKUP_BUCKET} \
+  --versioning-configuration Status=Enabled
+```
+
+#### Google Cloud Storage
+
+```bash
+gsutil cp "${BACKUP_FILE}" "gs://${BACKUP_BUCKET}/postgres/"
+```
+
+### Disaster Recovery Runbook
+
+1. **RTO (Recovery Time Objective)**: 1 hour
+2. **RPO (Recovery Point Objective)**: 6 hours (backup frequency)
+
+#### Steps for Full Recovery
+
+```bash
+# 1. Identify latest backup
+LATEST_BACKUP=$(ls -t backups/postgres/securesys_backup_*.sql.gz | head -1)
+echo "Restoring from: ${LATEST_BACKUP}"
+
+# 2. Provision new database server (if needed)
+docker-compose -f docker-compose.prod.yml up -d postgres
+
+# 3. Wait for PostgreSQL to be ready
+until docker exec securesys-postgres-prod pg_isready; do sleep 1; done
+
+# 4. Restore from backup
+docker exec securesys-postgres-backup \
+  /scripts/db-restore.sh "${LATEST_BACKUP}" --force
+
+# 5. Verify data integrity
+docker exec securesys-postgres-prod \
+  python manage.py migrate_scanning_data --verify
+
+# 6. Start application
+docker-compose -f docker-compose.prod.yml up -d
+
+# 7. Run smoke tests
+curl -f https://api.securesys.io/api/v1/health/
+```
+
+### Backup Verification Checklist
+
+- [ ] Backup file exists and is non-empty
+- [ ] Backup file integrity check passes (`gunzip -t`)
+- [ ] Restore to test database succeeds
+- [ ] Record counts match expected values
+- [ ] Application can connect and query data
+- [ ] Foreign key relationships are intact

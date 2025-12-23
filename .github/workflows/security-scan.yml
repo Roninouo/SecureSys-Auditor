@@ -1,0 +1,384 @@
+# Dependency Scanning and Security Automation
+# Runs on schedule and PR events
+# Uses multiple scanners for comprehensive coverage
+
+name: Security Scanning
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      full_scan:
+        description: 'Run full security scan'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Python Dependency Scanning
+  # ============================================================================
+  python-deps:
+    name: Python Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install pip-audit
+        run: pip install pip-audit safety
+      
+      - name: Run pip-audit
+        run: |
+          pip-audit -r reqs/requirements-base.txt \
+            --format json \
+            --output pip-audit-report.json \
+            --desc on || true
+      
+      - name: Run Safety check
+        run: |
+          safety check -r reqs/requirements-base.txt \
+            --json \
+            --output safety-report.json || true
+      
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+      
+      - name: Upload Safety results
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+      
+      - name: Comment on PR with vulnerabilities
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            let comment = '## 🔒 Python Dependency Scan Results\n\n';
+            
+            // Parse pip-audit results
+            try {
+              const pipAudit = JSON.parse(fs.readFileSync('pip-audit-report.json', 'utf8'));
+              if (pipAudit.dependencies) {
+                const vulns = pipAudit.dependencies.filter(d => d.vulns && d.vulns.length > 0);
+                if (vulns.length > 0) {
+                  comment += '### ⚠️ Vulnerabilities Found (pip-audit)\n\n';
+                  comment += '| Package | Version | Vulnerability | Fix Version |\n';
+                  comment += '|---------|---------|---------------|-------------|\n';
+                  vulns.forEach(dep => {
+                    dep.vulns.forEach(v => {
+                      comment += `| ${dep.name} | ${dep.version} | ${v.id} | ${v.fix_versions?.join(', ') || 'N/A'} |\n`;
+                    });
+                  });
+                } else {
+                  comment += '✅ No vulnerabilities found by pip-audit\n';
+                }
+              }
+            } catch (e) {
+              comment += '⚠️ Could not parse pip-audit results\n';
+            }
+            
+            comment += '\n---\n*Automated security scan*';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # ============================================================================
+  # JavaScript/npm Dependency Scanning
+  # ============================================================================
+  npm-deps:
+    name: npm Dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/frontend
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit
+        run: npm audit --json > npm-audit-report.json || true
+      
+      - name: Upload npm audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: src/frontend/npm-audit-report.json
+      
+      - name: Check for critical vulnerabilities
+        run: |
+          CRITICAL=$(cat npm-audit-report.json | jq '.metadata.vulnerabilities.critical // 0')
+          HIGH=$(cat npm-audit-report.json | jq '.metadata.vulnerabilities.high // 0')
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "::warning::Found $CRITICAL critical and $HIGH high severity npm vulnerabilities"
+          fi
+
+  # ============================================================================
+  # Container Image Scanning
+  # ============================================================================
+  container-scan:
+    name: Container Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build image for scanning
+        run: |
+          docker build -t securesys/backend:scan -f Dockerfile .
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'securesys/backend:scan'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          vuln-type: 'os,library'
+      
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Trivy in table format for PR comment
+        if: github.event_name == 'pull_request'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'securesys/backend:scan'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+  # ============================================================================
+  # Secret Scanning
+  # ============================================================================
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          extra_args: --only-verified
+      
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # SAST - Static Application Security Testing
+  # ============================================================================
+  sast:
+    name: SAST Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Bandit
+        run: pip install bandit[toml]
+      
+      - name: Run Bandit
+        run: |
+          bandit -r src/backend -f json -o bandit-report.json \
+            --exclude '**/tests/**,**/migrations/**' \
+            -ll || true
+      
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python, javascript
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # ============================================================================
+  # License Compliance
+  # ============================================================================
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install pip-licenses
+        run: pip install pip-licenses
+      
+      - name: Install dependencies
+        run: pip install -r reqs/requirements-base.txt
+      
+      - name: Check licenses
+        run: |
+          pip-licenses --format=json --output-file=licenses.json
+          
+          # Check for problematic licenses
+          FORBIDDEN_LICENSES="GPL-3.0|AGPL|SSPL"
+          if pip-licenses --format=plain | grep -E "$FORBIDDEN_LICENSES"; then
+            echo "::warning::Found potentially problematic licenses"
+          fi
+      
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: licenses.json
+
+  # ============================================================================
+  # Dependabot-style automated updates
+  # ============================================================================
+  dependency-updates:
+    name: Check for Updates
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install pip-tools
+        run: pip install pip-tools
+      
+      - name: Check for outdated packages
+        run: |
+          pip install -r reqs/requirements-base.txt
+          pip list --outdated --format=json > outdated-packages.json
+      
+      - name: Create issue for outdated packages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const outdated = JSON.parse(fs.readFileSync('outdated-packages.json', 'utf8'));
+            
+            if (outdated.length === 0) {
+              console.log('All packages are up to date');
+              return;
+            }
+            
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies'
+            });
+            
+            const existingIssue = issues.data.find(i => 
+              i.title === '📦 Outdated Dependencies Report'
+            );
+            
+            let body = '## Outdated Python Dependencies\n\n';
+            body += '| Package | Current | Latest | Type |\n';
+            body += '|---------|---------|--------|------|\n';
+            
+            for (const pkg of outdated.slice(0, 30)) {
+              body += `| ${pkg.name} | ${pkg.version} | ${pkg.latest_version} | ${pkg.latest_filetype} |\n`;
+            }
+            
+            if (outdated.length > 30) {
+              body += `\n... and ${outdated.length - 30} more packages\n`;
+            }
+            
+            body += '\n---\n*Generated automatically by dependency scanner*';
+            
+            if (existingIssue) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '📦 Outdated Dependencies Report',
+                body: body,
+                labels: ['dependencies', 'automated']
+              });
+            }
+
+  # ============================================================================
+  # Summary Report
+  # ============================================================================
+  summary:
+    name: Security Summary
+    needs: [python-deps, npm-deps, container-scan, secret-scan, sast, license-check]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+      
+      - name: Generate summary
+        run: |
+          echo "## 🛡️ Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scan | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Dependencies | ${{ needs.python-deps.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| npm Dependencies | ${{ needs.npm-deps.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Detection | ${{ needs.secret-scan.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST Analysis | ${{ needs.sast.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Check | ${{ needs.license-check.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY

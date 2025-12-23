@@ -1,0 +1,388 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "securesys-slos",
+    "title": "SecureSys Auditor - SLOs & Error Budget",
+    "tags": ["securesys", "slo", "error-budget"],
+    "timezone": "browser",
+    "refresh": "1m",
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Availability SLO (99.9%)",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "1 - (sum(rate(http_requests_total{status=~\"5..\"}[7d])) / sum(rate(http_requests_total[7d])))",
+            "legendFormat": "Availability"
+          }
+        ],
+        "options": {
+          "orientation": "auto",
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 0.99},
+                {"color": "yellow", "value": 0.995},
+                {"color": "green", "value": 0.999}
+              ]
+            },
+            "unit": "percentunit",
+            "min": 0.95,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Error Budget Remaining",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "clamp_min(1 - ((sum(rate(http_requests_total{status=~\"5..\"}[30d])) / sum(rate(http_requests_total[30d]))) / 0.001), 0)",
+            "legendFormat": "Budget Remaining"
+          }
+        ],
+        "options": {
+          "orientation": "auto",
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "orange", "value": 0.25},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 0.75}
+              ]
+            },
+            "unit": "percentunit",
+            "min": 0,
+            "max": 1
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Latency P95 SLO (< 500ms)",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))",
+            "legendFormat": "P95 Latency"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.3},
+                {"color": "orange", "value": 0.5},
+                {"color": "red", "value": 1}
+              ]
+            },
+            "unit": "s",
+            "min": 0,
+            "max": 2
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Latency P99 SLO (< 2s)",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1h])) by (le))",
+            "legendFormat": "P99 Latency"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "orange", "value": 2},
+                {"color": "red", "value": 5}
+              ]
+            },
+            "unit": "s",
+            "min": 0,
+            "max": 5
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Error Budget Burn Rate (30d window)",
+        "type": "timeseries",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "(sum(rate(http_requests_total{status=~\"5..\"}[1h])) / sum(rate(http_requests_total[1h]))) / 0.001",
+            "legendFormat": "Burn Rate (1h window)"
+          },
+          {
+            "expr": "(sum(rate(http_requests_total{status=~\"5..\"}[6h])) / sum(rate(http_requests_total[6h]))) / 0.001",
+            "legendFormat": "Burn Rate (6h window)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            },
+            "unit": "none",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "options": {
+          "legend": {"displayMode": "list", "placement": "bottom"},
+          "tooltip": {"mode": "multi"}
+        }
+      },
+      {
+        "id": 6,
+        "title": "Error Budget Consumption Over Time",
+        "type": "timeseries",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "1 - clamp_min(1 - (sum(increase(http_requests_total{status=~\"5..\"}[30d])) / (sum(increase(http_requests_total[30d])) * 0.001)), 0)",
+            "legendFormat": "Budget Consumed (30d)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 20,
+              "gradientMode": "scheme"
+            },
+            "unit": "percentunit",
+            "max": 1,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.5},
+                {"color": "orange", "value": 0.75},
+                {"color": "red", "value": 0.9}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Request Latency Distribution",
+        "type": "heatmap",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 18},
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_seconds_bucket[5m])) by (le)",
+            "format": "heatmap",
+            "legendFormat": "{{le}}"
+          }
+        ],
+        "options": {
+          "calculate": false,
+          "yAxis": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "SLO Compliance by Endpoint",
+        "type": "table",
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 18},
+        "targets": [
+          {
+            "expr": "topk(10, sum by (endpoint) (rate(http_requests_total{status=~\"5..\"}[24h])) / sum by (endpoint) (rate(http_requests_total[24h])))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "renameByName": {
+                "endpoint": "Endpoint",
+                "Value": "Error Rate"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Error Rate"},
+              "properties": [
+                {"id": "unit", "value": "percentunit"},
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "mode": "absolute",
+                    "steps": [
+                      {"color": "green", "value": null},
+                      {"color": "yellow", "value": 0.001},
+                      {"color": "red", "value": 0.01}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "title": "Scan Processing SLO",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "sum(rate(celery_task_succeeded_total{queue=\"scans\"}[1h])) / sum(rate(celery_task_received_total{queue=\"scans\"}[1h]))",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0.95},
+                {"color": "green", "value": 0.99}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Webhook Delivery SLO",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 28},
+        "targets": [
+          {
+            "expr": "sum(rate(webhook_delivery_success_total[1h])) / sum(rate(webhook_delivery_total[1h]))",
+            "legendFormat": "Delivery Rate"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0.95},
+                {"color": "green", "value": 0.99}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Database Query P95",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(django_db_query_duration_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 0.5}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 12,
+        "title": "Uptime (30d)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 28},
+        "targets": [
+          {
+            "expr": "avg_over_time(up{job=\"securesys-backend\"}[30d])",
+            "legendFormat": "Uptime"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 0.99},
+                {"color": "green", "value": 0.999}
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "enable": true,
+          "expr": "changes(deployment_timestamp[1m]) > 0",
+          "titleFormat": "Deployment",
+          "textFormat": "New version deployed"
+        }
+      ]
+    }
+  }
+}

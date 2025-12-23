@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: securesys-config
+  namespace: securesys
+  labels:
+    app.kubernetes.io/name: securesys-auditor
+data:
+  # Environment
+  ENVIRONMENT: "production"
+  DEBUG: "False"
+  
+  # Django settings
+  ALLOWED_HOSTS: "api.securesys.io,securesys.io"
+  CSRF_TRUSTED_ORIGINS: "https://securesys.io,https://api.securesys.io"
+  CORS_ALLOWED_ORIGINS: "https://securesys.io"
+  
+  # Database (host/port - credentials in secrets)
+  DB_HOST: "postgres.securesys.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "securesys_db"
+  
+  # Redis
+  CELERY_BROKER_URL: "redis://redis.securesys.svc.cluster.local:6379/0"
+  
+  # OIDC/Keycloak
+  OIDC_ENABLED: "true"
+  OIDC_ISSUER: "https://auth.securesys.io/realms/securesys"
+  OIDC_AUDIENCE: "securesys-backend"
+  OIDC_AUTO_CREATE_USER: "true"
+  OIDC_ALLOW_JWT_FALLBACK: "true"
+  
+  # OpenTelemetry
+  OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAME: "securesys-backend"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4317"
+  
+  # Webhooks
+  WEBHOOK_ENABLED: "true"
+  
+  # Logging
+  DJANGO_LOG_LEVEL: "INFO"
