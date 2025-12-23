@@ -510,6 +510,57 @@ class WebhookEndpoint(models.Model):
         self.save(update_fields=['last_triggered', 'last_status_code', 'failure_count', 'updated_at'])
 
 
+class WebhookDelivery(models.Model):
+    """
+    Tracks individual webhook delivery attempts.
+    Provides delivery audit trail and failure analysis.
+    """
+    
+    class Status(models.TextChoices):
+        SUCCESS = 'success', 'Success'
+        FAILED = 'failed', 'Failed'
+        PENDING = 'pending', 'Pending'
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    endpoint = models.ForeignKey(
+        WebhookEndpoint,
+        on_delete=models.CASCADE,
+        related_name='deliveries'
+    )
+    event_type = models.CharField(max_length=100, db_index=True)
+    payload = models.JSONField(default=dict)
+    
+    # Delivery tracking
+    attempt_number = models.IntegerField(default=1)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True
+    )
+    http_status_code = models.IntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    response_time_ms = models.IntegerField(null=True, blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    
+    class Meta:
+        db_table = 'webhook_deliveries'
+        verbose_name = 'webhook delivery'
+        verbose_name_plural = 'webhook deliveries'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['endpoint', 'created_at']),
+            models.Index(fields=['event_type']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Delivery to {self.endpoint.name} - {self.event_type} ({self.status})"
+
+
 class SecurityMaturityAssessment(models.Model):
     """
     Extended security maturity assessment following industry frameworks.
