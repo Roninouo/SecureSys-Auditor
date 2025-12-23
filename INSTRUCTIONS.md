@@ -12,6 +12,10 @@ The platform performs non-intrusive system audits, analyzes configurations, acce
 
 SecureSys Auditor bridges the gap between **technical security assessments** and **business-oriented decision making** by offering both technical insights for administrators and executive-level reports for management. The system is designed with security-by-design principles, scalability, and auditability in mind, making it suitable for small-to-medium enterprises and internal IT governance teams.
 
+### IMPORTANT TI CONSIDER
+
+ALWAYS ACTIVATE THE VENV:  `SecureSys-venv\Scripts\activate` if you are goign to interact with the bash or run the code.
+
 ---
 
 ## Project Objectives

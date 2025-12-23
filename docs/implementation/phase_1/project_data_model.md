@@ -1,96 +1,116 @@
-# ✅ Threat Model (STRIDE-Based)
+# ✅ Data Model (Logical & Relational)
 
-## 1. Assets to Protect
+## 1. Core Entities
 
-* Scan data (system configurations)
-* User identities and roles
-* Risk scores and reports
-* Authentication tokens
-* Audit logs
+### 1.1 System
 
----
+Represents a monitored machine.
 
-## 2. Threat Analysis (STRIDE)
-
-### S — Spoofing Identity
-
-**Threat:** Fake agent sends malicious scan data
-**Mitigation:**
-
-* Signed payloads
-* Agent identity verification
-* Token expiration
+| Field       | Type      | Description      |
+| ----------- | --------- | ---------------- |
+| id          | UUID      | Primary key      |
+| hostname    | String    | System name      |
+| os          | String    | Operating system |
+| environment | String    | Prod / Dev       |
+| created_at  | Timestamp | First seen       |
+| last_seen   | Timestamp | Last scan        |
 
 ---
 
-### T — Tampering
+### 1.2 Scan
 
-**Threat:** Scan data modified in transit
-**Mitigation:**
+Represents a single assessment execution.
 
-* TLS encryption
-* Payload signature validation
-* Hash verification
-
----
-
-### R — Repudiation
-
-**Threat:** User denies performing an action
-**Mitigation:**
-
-* Immutable audit logs
-* Timestamped events
-* User ID binding
+| Field          | Type        | Description         |
+| -------------- | ----------- | ------------------- |
+| id             | UUID        | Primary key         |
+| system_id      | FK → System | Related system      |
+| scan_date      | Timestamp   | Execution time      |
+| status         | Enum        | Pending / Completed |
+| risk_score     | Integer     | 0–100               |
+| maturity_level | Enum        | Reactive–Optimized  |
 
 ---
 
-### I — Information Disclosure
+### 1.3 Finding
 
-**Threat:** Exposure of sensitive system data
-**Mitigation:**
+Represents a detected security issue.
 
-* Encryption at rest
-* Field-level encryption
-* Role-based data access
-* Minimal data collection
-
----
-
-### D — Denial of Service
-
-**Threat:** API flooding or repeated scan submissions
-**Mitigation:**
-
-* Rate limiting
-* Background task queues
-* Payload size limits
+| Field       | Type      | Description            |
+| ----------- | --------- | ---------------------- |
+| id          | UUID      | Primary key            |
+| scan_id     | FK → Scan | Source scan            |
+| category    | String    | Access, Patch, Network |
+| severity    | Enum      | Low / Medium / High    |
+| description | Text      | Issue details          |
+| evidence    | JSON      | Supporting data        |
 
 ---
 
-### E — Elevation of Privilege
+### 1.4 Recommendation
 
-**Threat:** User gains unauthorized access
-**Mitigation:**
+Represents remediation guidance.
 
-* RBAC enforcement
-* Principle of least privilege
-* Token scope validation
-
----
-
-## 3. Residual Risk
-
-* Low to moderate risk remains for misconfigured deployments.
-* Accepted for MVP with documented mitigations.
+| Field      | Type         | Description         |
+| ---------- | ------------ | ------------------- |
+| id         | UUID         | Primary key         |
+| finding_id | FK → Finding | Related issue       |
+| priority   | Enum         | Low / Medium / High |
+| effort     | Enum         | Low / Medium / High |
+| steps      | Text         | Step-by-step fix    |
 
 ---
 
-## 4. Security Principles Applied
+### 1.5 User
 
-* Zero Trust (explicit verification)
-* Least Privilege
-* Defense in Depth
-* Secure Defaults
+Authenticated platform user.
+
+| Field      | Type      | Description              |
+| ---------- | --------- | ------------------------ |
+| id         | UUID      | Primary key              |
+| email      | String    | Login                    |
+| role       | Enum      | Viewer / Auditor / Admin |
+| created_at | Timestamp | Creation date            |
+
+---
+
+### 1.6 AuditLog
+
+Tracks sensitive actions.
+
+| Field     | Type      | Description |
+| --------- | --------- | ----------- |
+| id        | UUID      | Primary key |
+| user_id   | FK → User | Actor       |
+| action    | String    | Action name |
+| timestamp | Timestamp | Event time  |
+| metadata  | JSON      | Context     |
+
+---
+
+## 2. Relationships (Summary)
+
+* **System 1 → N Scan**
+* **Scan 1 → N Finding**
+* **Finding 1 → N Recommendation**
+* **User 1 → N AuditLog**
+
+---
+
+## 3. Data Governance
+
+* Scan data is immutable after completion
+* Audit logs are append-only
+* Retention policies configurable
+* Soft deletes for business entities
+
+---
+
+## 4. Indexing Strategy (Initial)
+
+* `system.hostname`
+* `scan.scan_date`
+* `finding.severity`
+* `auditlog.timestamp`
 
 ---
