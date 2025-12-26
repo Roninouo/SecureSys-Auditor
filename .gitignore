@@ -31,3 +31,6 @@ env.bak/
 venv.bak/
 SecureSys-venv/
 .env
+
+# Node modules
+node_modules/
