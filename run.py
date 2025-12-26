@@ -14,6 +14,7 @@ Commands:
     frontend     Start Vite frontend dev server
     celery       Start Celery worker
     services     Start Docker services (postgres, redis, keycloak)
+    createuser   Create a local login user (Django)
     test         Run HTTP tests against the API
     status       Check status of all services
     stop         Stop all running services
@@ -1032,6 +1033,100 @@ def cmd_stop(args):
     print_status("Docker services stopped", "success")
 
 
+def cmd_createuser(args):
+    """Create a local Django user for browser testing."""
+    # main() already prints banner + python version
+    _ensure_local_services_running()
+
+    # Create via Django shell so we use the project's configured AUTH_USER_MODEL
+    email = args.email.strip()
+    password = args.password
+    role = (args.role or "viewer").strip().lower()
+
+    if role not in {"viewer", "auditor", "admin"}:
+        print_status("Invalid role. Use: viewer|auditor|admin", "error")
+        return 2
+
+    is_superuser = bool(args.superuser) or role == "admin"
+
+    django_code = """
+import os
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+email = os.environ['SS_CREATE_EMAIL']
+password = os.environ['SS_CREATE_PASSWORD']
+role = os.environ.get('SS_CREATE_ROLE', 'viewer')
+is_superuser = os.environ.get('SS_CREATE_SUPERUSER', 'false').lower() == 'true'
+
+user, created = User.objects.get_or_create(email=email)
+user.role = role
+user.is_active = True
+user.is_staff = user.is_staff or is_superuser
+user.is_superuser = user.is_superuser or is_superuser
+user.set_password(password)
+user.save()
+
+print('CREATED' if created else 'UPDATED', user.email)
+""".strip()
+
+    env = {
+        "DJANGO_SETTINGS_MODULE": "backend.settings",
+        "SS_CREATE_EMAIL": email,
+        "SS_CREATE_PASSWORD": password,
+        "SS_CREATE_ROLE": role,
+        "SS_CREATE_SUPERUSER": "true" if is_superuser else "false",
+    }
+
+    docker_compose = shutil.which("docker-compose")
+    if docker_compose:
+        # Prefer creating the user inside the backend container so DB settings match docker-compose.
+        rc, out, _err = run_command(["docker-compose", "ps", "-q", "backend"], cwd=PROJECT_ROOT)
+        if rc == 0 and out.strip():
+            cmd = [
+                "docker-compose",
+                "exec",
+                "-T",
+                "-e",
+                f"SS_CREATE_EMAIL={email}",
+                "-e",
+                f"SS_CREATE_PASSWORD={password}",
+                "-e",
+                f"SS_CREATE_ROLE={role}",
+                "-e",
+                f"SS_CREATE_SUPERUSER={'true' if is_superuser else 'false'}",
+                "backend",
+                "python",
+                "manage.py",
+                "shell",
+                "-c",
+                django_code,
+            ]
+
+            result = subprocess.run(cmd, cwd=PROJECT_ROOT, text=True)
+            if result.returncode != 0:
+                print_status("Failed to create user inside backend container.", "error")
+                return result.returncode
+
+            print_status(f"User ready: {email} (role={role})", "success")
+            return 0
+
+    # Fallback: create user using local manage.py (expects correct DB_* env vars in your shell)
+    python = get_python_executable()
+    cmd = [python, "manage.py", "shell", "-c", django_code]
+    try:
+        result = subprocess.run(cmd, cwd=BACKEND_DIR, env={**os.environ, **env}, text=True)
+        if result.returncode != 0:
+            print_status("Failed to create user (Django shell returned non-zero).", "error")
+            return result.returncode
+    except Exception as e:
+        print_status(f"Failed to create user: {e}", "error")
+        return 1
+
+    print_status(f"User ready: {email} (role={role})", "success")
+    return 0
+
+
 def print_next_steps(report: TestReport):
     """Print recommended next steps based on test results."""
     print(f"\n{Colors.BOLD}NEXT STEPS{Colors.ENDC}")
@@ -1133,6 +1228,14 @@ def main():
     # Stop command
     stop_parser = subparsers.add_parser("stop", help="Stop Docker services")
     stop_parser.set_defaults(func=cmd_stop)
+
+    # Create user command
+    createuser_parser = subparsers.add_parser("createuser", help="Create a local login user")
+    createuser_parser.add_argument("--email", "-e", required=True, help="User email (login)")
+    createuser_parser.add_argument("--password", "-p", required=True, help="User password")
+    createuser_parser.add_argument("--role", "-r", default="admin", help="Role: viewer|auditor|admin")
+    createuser_parser.add_argument("--superuser", action="store_true", help="Also grant Django superuser")
+    createuser_parser.set_defaults(func=cmd_createuser)
     
     args = parser.parse_args()
     
