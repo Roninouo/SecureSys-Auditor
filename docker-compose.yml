@@ -143,7 +143,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./src/backend:/app:ro  # Read-only mount for development
+      - ./src/backend:/app  # Mount code for development
       - backend_static:/app/staticfiles
       - backend_media:/app/media
       - backend_logs:/app/logs

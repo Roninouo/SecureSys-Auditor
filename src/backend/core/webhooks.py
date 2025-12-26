@@ -9,7 +9,7 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import WebhookEndpoint
+from webhooks.models import WebhookEndpoint
 from .serializers import WebhookEndpointSerializer
 from .tasks import send_webhook_notification
 

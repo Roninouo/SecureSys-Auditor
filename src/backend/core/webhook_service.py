@@ -195,7 +195,7 @@ class WebhookDeliveryTracker:
         response_time_ms: Optional[int] = None
     ):
         """Record a webhook delivery attempt."""
-        from core.models import WebhookDelivery
+        from webhooks.models import WebhookDelivery
         
         try:
             WebhookDelivery.objects.create(
@@ -420,7 +420,7 @@ class EnhancedWebhookService:
         Returns:
             List of delivery results
         """
-        from core.models import WebhookEndpoint
+        from webhooks.models import WebhookEndpoint
         
         # Get active endpoints for this event type
         endpoints = WebhookEndpoint.objects.filter(

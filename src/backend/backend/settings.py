@@ -185,10 +185,6 @@ REST_FRAMEWORK = {
     # OpenAPI schema generation
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
-        'user': '1000/hour',
-        'scans': '100/hour',  # Rate limit for scan submissions
-    },
-}
 
 # Simple JWT Configuration
 SIMPLE_JWT = {
@@ -436,7 +432,7 @@ The API uses URL-based versioning. Current version: `v1`
     ],
     # Enum naming
     'ENUM_NAME_OVERRIDES': {
-        'SeverityEnum': 'core.models.Finding.severity',
-        'ScanStatusEnum': 'core.models.ScanResult.status',
+        'SeverityEnum': 'core.models.Finding.Severity.choices',
+        'ScanStatusEnum': 'core.models.Scan.Status.choices',
     },
 }

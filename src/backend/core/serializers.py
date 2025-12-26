@@ -215,7 +215,10 @@ class AuditLogSerializer(serializers.ModelSerializer):
             'id', 'user', 'user_email', 'action', 'timestamp',
             'ip_address', 'resource_type', 'resource_id', 'metadata'
         ]
-        read_only_fields = '__all__'
+        read_only_fields = (
+            'id', 'user', 'user_email', 'action', 'timestamp',
+            'ip_address', 'resource_type', 'resource_id', 'metadata'
+        )
 
 
 class FindingDetailSerializer(serializers.ModelSerializer):
@@ -233,7 +236,8 @@ class FindingDetailSerializer(serializers.ModelSerializer):
         ]
 
 
-from .models import WebhookEndpoint, SecurityMaturityAssessment
+from webhooks.models import WebhookEndpoint
+from .models import SecurityMaturityAssessment
 
 
 class WebhookEndpointSerializer(serializers.ModelSerializer):

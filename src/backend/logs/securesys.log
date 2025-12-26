@@ -1,0 +1,10 @@
+{"asctime": "2025-12-26 10:22:42,470", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 10:22:42,471", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 10:22:46,472", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 10:22:46,472", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 10:25:01,348", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 10:25:01,350", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 10:25:09,388", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 10:25:09,388", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 10:27:41,516", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 10:27:41,516", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}

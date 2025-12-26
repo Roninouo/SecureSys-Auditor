@@ -8,6 +8,7 @@ import logging
 from typing import List, Optional, Tuple, Any
 
 from django.conf import settings
+from django.utils.module_loading import import_string
 from rest_framework import authentication, exceptions
 from rest_framework.request import Request
 
@@ -56,10 +57,14 @@ class ProviderChainAuthentication(authentication.BaseAuthentication):
         
         # Instantiate providers
         for provider_class in provider_classes:
+            if isinstance(provider_class, str):
+                provider_class = import_string(provider_class)
+
             if isinstance(provider_class, type):
                 provider = provider_class()
             else:
                 provider = provider_class
+
             self._providers.append(provider)
         
         # Sort by priority

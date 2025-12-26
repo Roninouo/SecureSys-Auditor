@@ -283,7 +283,7 @@ def send_webhook_notification(self, event_type: str, payload: dict):
         logger.debug("Webhooks disabled, skipping notification")
         return {'status': 'skipped', 'reason': 'webhooks_disabled'}
     
-    from .models import WebhookEndpoint
+    from webhooks.models import WebhookEndpoint
     
     try:
         # Get active webhook endpoints for this event type

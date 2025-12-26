@@ -4,6 +4,13 @@
 # Build stage
 FROM python:3.11-slim as builder
 
+# Allow configuring pip index/timeout for restricted networks
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_DEFAULT_TIMEOUT=60
+ENV PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_DEFAULT_TIMEOUT=${PIP_DEFAULT_TIMEOUT} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 WORKDIR /app
 
 # Install build dependencies
