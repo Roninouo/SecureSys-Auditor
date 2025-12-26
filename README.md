@@ -322,7 +322,7 @@ ALLOWED_HOSTS=your-domain.com,api.your-domain.com
 DB_NAME=securesys_db
 DB_USER=securesys_user
 DB_PASSWORD=your-secure-password
-CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6380/0
 CORS_ALLOWED_ORIGINS=https://your-domain.com
 ```
 

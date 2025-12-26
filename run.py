@@ -893,12 +893,14 @@ def cmd_status(args):
     """Check status of all services."""
     print_banner()
     print_status("Checking service status...\n", "info")
+
+    redis_port = os.getenv("REDIS_PORT", "6380")
     
     services = {
         "Backend API": f"http://localhost:{DEFAULT_BACKEND_PORT}/health/health/",
         "Frontend": f"http://localhost:{DEFAULT_FRONTEND_PORT}/",
         "PostgreSQL": "localhost:5432",
-        "Redis": "localhost:6379",
+        "Redis": f"localhost:{redis_port}",
         "Keycloak": "http://localhost:8080/health/ready",
         "Jaeger": "http://localhost:16686/",
     }

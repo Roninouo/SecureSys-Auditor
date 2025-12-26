@@ -420,7 +420,7 @@ DB_HOST=localhost
 DB_PORT=5432
 
 # Redis/Celery
-CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_BROKER_URL=redis://localhost:6380/0
 
 # OpenTelemetry
 OTEL_ENABLED=true
