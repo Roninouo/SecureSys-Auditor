@@ -17,6 +17,31 @@ from .tasks import generate_pdf_report_task
 logger = logging.getLogger(__name__)
 
 
+class ReportDownloadView(APIView):
+    """
+    Download a generated report by filename.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAuditorOrAdmin]
+    
+    def get(self, request, filename):
+        """Download a report by filename."""
+        service = get_report_service()
+        filepath = service.get_report_path(filename)
+        
+        if not filepath:
+            return Response(
+                {'error': 'Report not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return FileResponse(
+            open(filepath, 'rb'),
+            content_type='application/pdf',
+            as_attachment=True,
+            filename=filename
+        )
+
+
 class ReportGenerationView(APIView):
     """
     API endpoint for generating PDF security reports.
@@ -59,7 +84,7 @@ class ReportGenerationView(APIView):
             )
         
         # Verify scan exists and is completed
-        from core.models import Scan
+        from scanning.models import Scan
         try:
             scan = Scan.objects.get(id=scan_id)
         except Scan.DoesNotExist:

@@ -98,7 +98,7 @@ class ReportService:
             raise RuntimeError("WeasyPrint is not available for PDF generation")
         
         # Import here to avoid circular dependency
-        from core.models import Scan
+        from scanning.models import Scan
         
         # Get scan
         try:

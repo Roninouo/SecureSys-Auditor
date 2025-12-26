@@ -148,3 +148,56 @@
 {"asctime": "2025-12-26 12:49:22,570", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
 {"asctime": "2025-12-26 12:50:50,546", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
 {"asctime": "2025-12-26 12:50:50,546", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:51:45,177", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:51:45,177", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:52:54,118", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:52:54,118", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:54:40,420", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:54:40,420", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:54:48,498", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:54:48,498", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:54:58,353", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:54:58,353", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:55:30,523", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:55:30,523", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:55:34,559", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:55:34,559", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:55:49,646", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:55:49,646", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:55:55,936", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:55:55,936", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:56:08,111", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:56:08,111", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:56:25,215", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:56:25,215", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:56:35,833", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:56:35,833", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:56:50,376", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:56:50,376", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:57:01,540", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:57:01,540", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 12:57:53,886", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 12:57:53,886", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 13:01:46,438", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 13:01:46,439", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 13:01:48,436", "levelname": "INFO", "name": "core", "message": "Processing scan f3308108-9d13-4a6c-9353-0a993cf0532f", "scan_id": "f3308108-9d13-4a6c-9353-0a993cf0532f", "system_id": "3a1f57cc-28ea-4d52-a767-d85314b06637"}
+{"asctime": "2025-12-26 13:01:48,440", "levelname": "INFO", "name": "core", "message": "Scan f3308108-9d13-4a6c-9353-0a993cf0532f completed", "scan_id": "f3308108-9d13-4a6c-9353-0a993cf0532f", "risk_score": 86, "findings_count": 6}
+{"asctime": "2025-12-26 13:01:48,443", "levelname": "INFO", "name": "core", "message": "Processing scan 13fbb1a6-d4f6-4f85-acd6-01fad2fb6dd0", "scan_id": "13fbb1a6-d4f6-4f85-acd6-01fad2fb6dd0", "system_id": "e86439d2-0a5c-4d79-a852-df483aae112d"}
+{"asctime": "2025-12-26 13:01:48,446", "levelname": "INFO", "name": "core", "message": "Scan 13fbb1a6-d4f6-4f85-acd6-01fad2fb6dd0 completed", "scan_id": "13fbb1a6-d4f6-4f85-acd6-01fad2fb6dd0", "risk_score": 86, "findings_count": 6}
+{"asctime": "2025-12-26 13:01:48,451", "levelname": "INFO", "name": "core", "message": "Processing scan c1b32e58-d8be-4e5f-916f-ad7f0d5ebf5a", "scan_id": "c1b32e58-d8be-4e5f-916f-ad7f0d5ebf5a", "system_id": "363ab62c-d460-4497-aab7-08d3483e6e64"}
+{"asctime": "2025-12-26 13:01:48,454", "levelname": "INFO", "name": "core", "message": "Scan c1b32e58-d8be-4e5f-916f-ad7f0d5ebf5a completed", "scan_id": "c1b32e58-d8be-4e5f-916f-ad7f0d5ebf5a", "risk_score": 86, "findings_count": 6}
+{"asctime": "2025-12-26 13:01:48,458", "levelname": "INFO", "name": "core", "message": "Processing scan 4844b82c-059d-4e57-9fc7-dc7b7ef0ad43", "scan_id": "4844b82c-059d-4e57-9fc7-dc7b7ef0ad43", "system_id": "200af346-4f4b-405c-b8e9-f6fe164d363d"}
+{"asctime": "2025-12-26 13:01:48,458", "levelname": "INFO", "name": "core", "message": "Scan 4844b82c-059d-4e57-9fc7-dc7b7ef0ad43 completed", "scan_id": "4844b82c-059d-4e57-9fc7-dc7b7ef0ad43", "risk_score": 0, "findings_count": 0}
+{"asctime": "2025-12-26 13:01:48,462", "levelname": "INFO", "name": "core", "message": "Processing scan 8f6f3628-db92-464a-8479-d33fb0b601e1", "scan_id": "8f6f3628-db92-464a-8479-d33fb0b601e1", "system_id": "b6e08278-3fa6-4f13-9e49-f98e34b05fda"}
+{"asctime": "2025-12-26 13:01:48,465", "levelname": "INFO", "name": "core", "message": "Scan 8f6f3628-db92-464a-8479-d33fb0b601e1 completed", "scan_id": "8f6f3628-db92-464a-8479-d33fb0b601e1", "risk_score": 86, "findings_count": 6}
+{"asctime": "2025-12-26 13:01:48,469", "levelname": "INFO", "name": "core", "message": "Processing scan e2b9d770-5ca8-46c9-9ab8-93935538081c", "scan_id": "e2b9d770-5ca8-46c9-9ab8-93935538081c", "system_id": "1a36d49b-11c9-4182-97fc-a6b9158c9241"}
+{"asctime": "2025-12-26 13:01:48,472", "levelname": "INFO", "name": "core", "message": "Scan e2b9d770-5ca8-46c9-9ab8-93935538081c completed", "scan_id": "e2b9d770-5ca8-46c9-9ab8-93935538081c", "risk_score": 86, "findings_count": 6}
+{"asctime": "2025-12-26 13:01:48,477", "levelname": "ERROR", "name": "core", "message": "Scan not found: be7495b1-95a0-4bc7-895d-1ef47a9b811b"}
+{"asctime": "2025-12-26 13:01:48,482", "levelname": "INFO", "name": "core", "message": "Processing scan 7bf5dab3-5011-4708-819d-7a263cfdcc98", "scan_id": "7bf5dab3-5011-4708-819d-7a263cfdcc98", "system_id": "9f5a0db1-901d-4af7-8c83-6421fe1b1090"}
+{"asctime": "2025-12-26 13:01:48,482", "levelname": "ERROR", "name": "core", "message": "Error processing scan 7bf5dab3-5011-4708-819d-7a263cfdcc98: Analysis failed"}
+{"asctime": "2025-12-26 13:01:48,488", "levelname": "INFO", "name": "core", "message": "Cleaned up 3 old scans", "scans_cleaned": 3, "cutoff_date": "2025-09-27 19:01:48.487754+00:00"}
+{"asctime": "2025-12-26 13:01:48,492", "levelname": "INFO", "name": "core", "message": "Cleaned up 0 old scans", "scans_cleaned": 0, "cutoff_date": "2025-09-27 19:01:48.492267+00:00"}
+{"asctime": "2025-12-26 13:01:48,496", "levelname": "INFO", "name": "core", "message": "Daily report generated", "date": "2025-12-26", "new_scans": 0, "new_findings": 0, "critical_unresolved": 0, "high_unresolved": 0}
+{"asctime": "2025-12-26 13:01:48,502", "levelname": "INFO", "name": "core", "message": "Daily report generated", "date": "2025-12-26", "new_scans": 3, "new_findings": 0, "critical_unresolved": 0, "high_unresolved": 0}
+{"asctime": "2025-12-26 13:03:42,107", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 13:03:42,107", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}

@@ -39,10 +39,17 @@ RUN groupadd -r securesys && useradd -r -g securesys securesys
 
 WORKDIR /app
 
-# Install runtime dependencies only
+# Install runtime dependencies only (including WeasyPrint/GTK deps for PDF reports)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    # WeasyPrint dependencies for PDF report generation
+    libglib2.0-0 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    libffi-dev \
+    shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual environment from builder

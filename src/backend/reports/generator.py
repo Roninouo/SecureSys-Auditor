@@ -13,14 +13,14 @@ from django.template.loader import render_to_string
 
 logger = logging.getLogger(__name__)
 
-# Try to import WeasyPrint
+# Try to import WeasyPrint (requires GTK libraries on some platforms)
+WEASYPRINT_AVAILABLE = False
 try:
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
     WEASYPRINT_AVAILABLE = True
-except ImportError:
-    WEASYPRINT_AVAILABLE = False
-    logger.warning("WeasyPrint not available. PDF generation will be disabled.")
+except (ImportError, OSError) as e:
+    logger.warning(f"WeasyPrint not available. PDF generation will be disabled. Error: {e}")
 
 
 # NIST CSF Control Mapping

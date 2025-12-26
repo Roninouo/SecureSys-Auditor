@@ -105,6 +105,41 @@ Agent Scan → API Ingestion → Risk Analysis → Dashboard Visualization
 - Redis 6+
 - Docker & Docker Compose (recommended)
 
+### One-Command Local Deploy (Docker)
+
+```bash
+# Clone and enter directory
+git clone https://github.com/securesys/auditor.git
+cd SecureSys-Auditor
+
+# Copy environment file
+cp .env.example .env
+
+# Start everything (backend + worker + db + redis + frontend)
+docker-compose up -d
+
+# Wait for services to be healthy, then access:
+# - Frontend Dashboard: http://localhost:3000
+# - Backend API: http://localhost:8000/api/v1/
+# - API Health: http://localhost:8000/api/v1/health/
+# - API Docs: http://localhost:8000/api/docs/
+```
+
+### Quick End-to-End Test
+
+After starting services, run a sample scan:
+
+```bash
+# Create a test user
+docker-compose exec backend python manage.py createsuperuser
+
+# Run the agent scanner locally (collects system info)
+python run.py scan --api-url http://localhost:8000 --api-key YOUR_KEY
+
+# Or use the test script
+python run.py test
+```
+
 ### Using Docker (Recommended)
 
 ```bash
