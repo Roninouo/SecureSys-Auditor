@@ -28,6 +28,7 @@ import signal
 import subprocess
 import sys
 import time
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -47,6 +48,51 @@ VENV_DIR = PROJECT_ROOT / "SecureSys-venv"
 DEFAULT_BACKEND_PORT = 8000
 DEFAULT_FRONTEND_PORT = 5173
 DEFAULT_API_URL = f"http://localhost:{DEFAULT_BACKEND_PORT}"
+
+
+def _tcp_port_open(host: str, port: int, timeout_seconds: float = 0.5) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout_seconds):
+            return True
+    except OSError:
+        return False
+
+
+def _ensure_local_services_running() -> None:
+    """Best-effort start of local Docker services when deps are missing."""
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = int(os.getenv("DB_PORT", "5432"))
+    redis_port = int(os.getenv("REDIS_PORT", "6380"))
+
+    postgres_up = _tcp_port_open(db_host, db_port)
+    redis_up = _tcp_port_open("localhost", redis_port)
+    if postgres_up and redis_up:
+        return
+
+    docker_compose = shutil.which("docker-compose")
+    if not docker_compose:
+        print_status(
+            f"Dependencies not reachable (Postgres {db_host}:{db_port}, Redis localhost:{redis_port}). Run: python run.py services",
+            "warning",
+        )
+        return
+
+    print_status("Starting Docker services (postgres/redis/keycloak)...", "info")
+    os.chdir(PROJECT_ROOT)
+    rc = os.system("docker-compose -f docker-compose.yml up -d")
+    if rc != 0:
+        print_status("Failed to start Docker services. Run: python run.py services", "warning")
+        return
+
+    # Wait briefly for ports to come up
+    for _ in range(30):
+        if _tcp_port_open(db_host, db_port) and _tcp_port_open("localhost", redis_port):
+            return
+        time.sleep(1)
+
+    print_status("Docker services started, but dependencies are still not reachable yet.", "warning")
 
 
 class Colors:
@@ -186,13 +232,36 @@ def run_command(
             capture_output=capture_output,
             text=True,
             timeout=timeout,
-            shell=platform.system() == "Windows"
+            shell=False
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return -1, "", "Command timed out"
     except Exception as e:
         return -1, "", str(e)
+
+
+def _windows_wrap_cmd_if_needed(cmd: List[str]) -> List[str]:
+    """Wrap .cmd/.bat invocations via cmd.exe so Popen can run them reliably."""
+    if platform.system() != "Windows":
+        return cmd
+    if not cmd:
+        return cmd
+
+    executable = cmd[0]
+    resolved = shutil.which(executable) or executable
+    suffix = Path(resolved).suffix.lower()
+
+    if suffix in {".cmd", ".bat"}:
+        return [
+            "cmd.exe",
+            "/d",
+            "/s",
+            "/c",
+            subprocess.list2cmdline(cmd),
+        ]
+
+    return cmd
 
 
 def start_process(
@@ -208,6 +277,7 @@ def start_process(
     
     try:
         if platform.system() == "Windows":
+            cmd = _windows_wrap_cmd_if_needed(cmd)
             # On Windows, use CREATE_NEW_PROCESS_GROUP for proper signal handling
             process = subprocess.Popen(
                 cmd,
@@ -217,9 +287,10 @@ def start_process(
                 stderr=subprocess.STDOUT,
                 text=True,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-                shell=True
+                shell=False
             )
         else:
+            setsid_fn = getattr(os, "setsid", None)
             process = subprocess.Popen(
                 cmd,
                 cwd=cwd,
@@ -227,7 +298,7 @@ def start_process(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                preexec_fn=os.setsid
+                preexec_fn=setsid_fn
             )
         print_status(f"Started {name} (PID: {process.pid})", "success")
         return process
@@ -283,7 +354,12 @@ class ProcessManager:
                 if platform.system() == "Windows":
                     process.terminate()
                 else:
-                    os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                    killpg_fn = getattr(os, "killpg", None)
+                    getpgid_fn = getattr(os, "getpgid", None)
+                    if callable(killpg_fn) and callable(getpgid_fn):
+                        killpg_fn(getpgid_fn(process.pid), signal.SIGTERM)
+                    else:
+                        process.terminate()
                 print_status(f"Stopped {name}", "info")
             except Exception as e:
                 print_status(f"Error stopping {name}: {e}", "warning")
@@ -301,9 +377,17 @@ class ProcessManager:
             while True:
                 time.sleep(1)
                 # Check if any process has died
+                stopped: List[str] = []
                 for name, process in self.processes.items():
                     if process.poll() is not None:
                         print_status(f"{name} has stopped (exit code: {process.returncode})", "warning")
+                        stopped.append(name)
+
+                for name in stopped:
+                    self.processes.pop(name, None)
+
+                if not self.processes:
+                    break
         except KeyboardInterrupt:
             print_status("\nReceived shutdown signal...", "info")
             self.stop_all()
@@ -768,15 +852,14 @@ def cmd_backend(args):
         "DJANGO_SETTINGS_MODULE": "backend.settings",
         "DEBUG": "True",
     }
-    
-    cmd = f'"{python}" manage.py runserver {args.host}:{args.port}'
+
+    cmd = [python, "manage.py", "runserver", f"{args.host}:{args.port}"]
     
     if args.foreground:
-        os.chdir(BACKEND_DIR)
-        os.system(cmd)
+        subprocess.run(cmd, cwd=BACKEND_DIR, env={**os.environ, **env})
     else:
         return start_process(
-            [cmd],
+            cmd,
             cwd=BACKEND_DIR,
             env=env,
             name="backend"
@@ -788,14 +871,23 @@ def cmd_frontend(args):
     print_status("Starting Vite frontend dev server...", "info")
     
     npm = get_npm_command()
-    cmd = f"{npm} run dev -- --host {args.host} --port {args.frontend_port}"
+    cmd = [
+        npm,
+        "run",
+        "dev",
+        "--",
+        "--host",
+        args.host,
+        "--port",
+        str(args.frontend_port),
+    ]
     
     if args.foreground:
-        os.chdir(FRONTEND_DIR)
-        os.system(cmd)
+        cmd_to_run = _windows_wrap_cmd_if_needed(cmd)
+        subprocess.run(cmd_to_run, cwd=FRONTEND_DIR)
     else:
         return start_process(
-            [cmd],
+            cmd,
             cwd=FRONTEND_DIR,
             name="frontend"
         )
@@ -806,14 +898,13 @@ def cmd_celery(args):
     print_status("Starting Celery worker...", "info")
     
     python = get_python_executable()
-    cmd = f'"{python}" -m celery -A backend worker -l {args.log_level}'
+    cmd = [python, "-m", "celery", "-A", "backend", "worker", "-l", args.log_level]
     
     if args.foreground:
-        os.chdir(BACKEND_DIR)
-        os.system(cmd)
+        subprocess.run(cmd, cwd=BACKEND_DIR)
     else:
         return start_process(
-            [cmd],
+            cmd,
             cwd=BACKEND_DIR,
             name="celery"
         )
@@ -844,6 +935,8 @@ def cmd_services(args):
 def cmd_all(args):
     """Start all components."""
     print_status("Starting all components...", "info")
+
+    _ensure_local_services_running()
     
     manager = ProcessManager()
     
