@@ -201,3 +201,7 @@
 {"asctime": "2025-12-26 13:01:48,502", "levelname": "INFO", "name": "core", "message": "Daily report generated", "date": "2025-12-26", "new_scans": 3, "new_findings": 0, "critical_unresolved": 0, "high_unresolved": 0}
 {"asctime": "2025-12-26 13:03:42,107", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
 {"asctime": "2025-12-26 13:03:42,107", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 13:30:08,280", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 13:30:08,280", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}
+{"asctime": "2025-12-26 13:39:11,696", "levelname": "INFO", "name": "core", "message": "OpenTelemetry not installed. Observability features disabled."}
+{"asctime": "2025-12-26 13:39:11,697", "levelname": "WARNING", "name": "core", "message": "OpenTelemetry not available, skipping initialization"}

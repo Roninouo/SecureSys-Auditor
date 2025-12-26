@@ -134,6 +134,42 @@ export const authApi = {
   },
 }
 
+// Reports API
+export const reportsApi = {
+  generate: async (data: {
+    scan_id: string
+    report_type: 'executive' | 'technical' | 'compliance'
+    async?: boolean
+    company_name?: string
+  }) => {
+    const response = await api.post('/reports/generate/', data)
+    return response.data
+  },
+
+  getStatus: async (taskId: string) => {
+    const response = await api.get('/reports/generate/', {
+      params: { task_id: taskId },
+    })
+    return response.data
+  },
+
+  download: async (filename: string) => {
+    const response = await api.get(`/reports/download/${filename}/`, {
+      responseType: 'blob',
+    })
+
+    const blob = new Blob([response.data], { type: 'application/pdf' })
+    const url = window.URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(url)
+  },
+}
+
 // Systems API (uses new scanning module)
 export const systemsApi = {
   getAll: async () => {

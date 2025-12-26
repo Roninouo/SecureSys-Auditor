@@ -365,7 +365,9 @@ CORS_ALLOWED_ORIGINS=https://your-domain.com
 
 ```bash
 # .env file
-VITE_API_URL=http://localhost:8000
+VITE_API_URL=http://localhost:8000/api/v1
+# Optional (overrides scanning base separately)
+VITE_SCANNING_API_URL=http://localhost:8000/api/v1/scanning
 ```
 
 ---

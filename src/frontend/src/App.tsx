@@ -8,6 +8,8 @@ import SystemsPage from './pages/SystemsPage'
 import SystemDetailPage from './pages/SystemDetailPage'
 import ScanDetailPage from './pages/ScanDetailPage'
 import ScanListPage from './pages/ScanListPage'
+import ReportsPage from './pages/ReportsPage'
+import SettingsPage from './pages/SettingsPage'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
@@ -33,6 +35,8 @@ function App() {
         <Route path="systems/:systemId" element={<SystemDetailPage />} />
         <Route path="scans" element={<ScanListPage />} />
         <Route path="scans/:scanId" element={<ScanDetailPage />} />
+        <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   )
