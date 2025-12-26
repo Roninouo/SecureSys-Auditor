@@ -47,7 +47,7 @@
       "description": "Django REST API Backend",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "backend-client-secret-change-in-production",
+      "secret": "REPLACE_ME_BACKEND_CLIENT_SECRET",
       "bearerOnly": true,
       "publicClient": false,
       "protocol": "openid-connect",
@@ -95,7 +95,7 @@
       "description": "Scanner Agent Authentication",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "agent-client-secret-change-in-production",
+      "secret": "REPLACE_ME_AGENT_CLIENT_SECRET",
       "serviceAccountsEnabled": true,
       "publicClient": false,
       "protocol": "openid-connect",
@@ -115,13 +115,6 @@
       "enabled": true,
       "firstName": "Admin",
       "lastName": "User",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "admin123!",
-          "temporary": true
-        }
-      ],
       "realmRoles": ["admin"]
     },
     {
@@ -131,13 +124,6 @@
       "enabled": true,
       "firstName": "Auditor",
       "lastName": "User",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "auditor123!",
-          "temporary": true
-        }
-      ],
       "realmRoles": ["auditor"]
     },
     {
@@ -147,13 +133,6 @@
       "enabled": true,
       "firstName": "Viewer",
       "lastName": "User",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "viewer123!",
-          "temporary": true
-        }
-      ],
       "realmRoles": ["viewer"]
     }
   ],

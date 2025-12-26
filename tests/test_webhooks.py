@@ -228,6 +228,7 @@ class TestWebhookService:
             endpoint_id="test-endpoint-9",
             event_type="test.event",
             payload={"message": "test"},
+            secret="test-secret",
             max_retries=3
         )
         
@@ -253,11 +254,31 @@ class TestWebhookService:
             endpoint_url="http://localhost:8888/webhook",
             endpoint_id="test-endpoint-10",
             event_type="test.event",
-            payload={"message": "test"}
+            payload={"message": "test"},
+            secret="test-secret",
         )
         
         assert result['success'] is False
         assert result['error'] == 'circuit_breaker_open'
+
+    def test_send_webhook_fails_closed_without_secret(self, mock_webhook_server):
+        """Webhook sending must fail closed if no signing secret is configured."""
+        MockWebhookHandler.response_status = 200
+
+        result = webhook_service.send_webhook(
+            endpoint_url="http://localhost:8888/webhook",
+            endpoint_id="test-endpoint-no-secret",
+            event_type="test.event",
+            payload={"message": "test"},
+            secret=None,
+        )
+
+        assert result['success'] is False
+        assert result['error'] == 'missing_webhook_secret'
+        assert result.get('attempts') == 0
+
+        # No request should be sent when secret is missing.
+        assert len(MockWebhookHandler.requests_received) == 0
     
     def test_send_webhook_respects_rate_limit(self):
         """Test webhook service respects rate limiting."""

@@ -32,5 +32,12 @@ venv.bak/
 SecureSys-venv/
 .env
 
+# Runtime logs
+src/backend/logs/
+
+# TLS certs (compose-prod)
+nginx/ssl/*
+!nginx/ssl/README.md
+
 # Node modules
 node_modules/

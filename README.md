@@ -148,7 +148,7 @@ git clone https://github.com/securesys/auditor.git
 cd SecureSys-Auditor
 
 # Copy environment template
-cp env.example .env
+cp .env.example .env
 # Edit .env with your configuration
 
 # Start all services
@@ -313,10 +313,10 @@ securesys-agent status
 
 ### Environment Variables
 
-Copy `env.example` to `.env` and configure the required variables:
+Copy `.env.example` to `.env` and configure the required variables:
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 #### Required in Production

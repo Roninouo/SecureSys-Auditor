@@ -17,6 +17,43 @@ log() {
 
 log "Starting database backup..."
 
+push_backup_success_metric() {
+    # Optional: push backup success timestamp to Prometheus Pushgateway.
+    # This enables the DatabaseBackupStale alert.
+    if [ -z "${PUSHGATEWAY_URL:-}" ]; then
+        return 0
+    fi
+
+    if ! command -v curl >/dev/null 2>&1; then
+        log "WARNING: curl not found; cannot push backup metrics to Pushgateway"
+        return 0
+    fi
+
+    local ts
+    ts=$(date +%s)
+
+    local job
+    job="${PUSHGATEWAY_JOB:-securesys_postgres_backup}"
+    local instance
+    instance="${PUSHGATEWAY_INSTANCE:-${HOSTNAME}}"
+
+    local url
+    url="${PUSHGATEWAY_URL%/}/metrics/job/${job}/instance/${instance}"
+
+    local metrics
+    metrics=$(cat <<EOF
+# TYPE backup_last_success_timestamp gauge
+backup_last_success_timestamp ${ts}
+EOF
+)
+
+    if echo "${metrics}" | curl --silent --show-error --fail --data-binary @- "${url}" >/dev/null; then
+        log "Pushed backup_last_success_timestamp=${ts} to Pushgateway"
+    else
+        log "WARNING: Failed to push backup metrics to Pushgateway (${url})"
+    fi
+}
+
 # Create backup directory if it doesn't exist
 mkdir -p "${BACKUP_DIR}"
 
@@ -64,6 +101,9 @@ fi
 # Calculate backup size
 BACKUP_SIZE=$(du -h "${BACKUP_FILE}" | cut -f1)
 log "Backup created successfully: ${BACKUP_FILE} (${BACKUP_SIZE})"
+
+# Emit success metric for alerting (optional)
+push_backup_success_metric
 
 # Cleanup old backups
 log "Cleaning up backups older than ${RETENTION_DAYS} days..."

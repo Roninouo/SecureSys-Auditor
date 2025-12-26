@@ -311,8 +311,23 @@ def send_webhook_notification(self, event_type: str, payload: dict):
                 
                 # Sign payload with HMAC
                 payload_json = json.dumps(webhook_payload, sort_keys=True)
+                signing_secret = (endpoint.secret or settings.WEBHOOK_SECRET or '').strip()
+                if not signing_secret:
+                    logger.error(
+                        "Webhook signing secret missing; refusing to send webhook",
+                        extra={
+                            'endpoint': endpoint.url,
+                            'event_type': event_type,
+                        },
+                    )
+                    results.append({
+                        'endpoint': endpoint.url,
+                        'success': False,
+                        'error': 'missing_webhook_secret',
+                    })
+                    continue
                 signature = hmac.new(
-                    endpoint.secret.encode() if endpoint.secret else settings.WEBHOOK_SECRET.encode(),
+                    signing_secret.encode(),
                     payload_json.encode(),
                     hashlib.sha256
                 ).hexdigest()

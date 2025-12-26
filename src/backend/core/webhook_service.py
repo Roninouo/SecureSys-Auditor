@@ -292,7 +292,21 @@ class EnhancedWebhookService:
         
         # Sign payload
         payload_json = json.dumps(webhook_payload, sort_keys=True)
-        signing_secret = secret or getattr(settings, 'WEBHOOK_SECRET', 'default-secret')
+        signing_secret = (secret or getattr(settings, 'WEBHOOK_SECRET', '') or '').strip()
+        if not signing_secret:
+            logger.error(
+                "Webhook signing secret missing; refusing to send webhook",
+                extra={
+                    'endpoint_id': endpoint_id,
+                    'event_type': event_type,
+                },
+            )
+            return {
+                'success': False,
+                'error': 'missing_webhook_secret',
+                'message': 'Webhook signing requires an endpoint secret or WEBHOOK_SECRET to be set',
+                'attempts': 0,
+            }
         signature = hmac.new(
             signing_secret.encode(),
             payload_json.encode(),

@@ -108,7 +108,23 @@ class WebhookService:
         }
         
         # Sign payload
-        signature = self._sign_payload(webhook_payload, endpoint.secret)
+        try:
+            signature = self._sign_payload(webhook_payload, endpoint.secret)
+        except ValueError as e:
+            logger.error(
+                "Webhook signing secret missing; refusing to send webhook",
+                extra={
+                    'endpoint_id': str(endpoint.id),
+                    'endpoint_url': endpoint.url,
+                    'event_type': event_type,
+                },
+            )
+            return DeliveryResult(
+                endpoint_id=str(endpoint.id),
+                endpoint_url=endpoint.url,
+                success=False,
+                error=str(e),
+            )
         
         # Build headers
         headers = {
@@ -218,7 +234,11 @@ class WebhookService:
         
         Uses endpoint secret or global WEBHOOK_SECRET.
         """
-        secret_key = secret or getattr(settings, 'WEBHOOK_SECRET', 'default-secret')
+        secret_key = (secret or getattr(settings, 'WEBHOOK_SECRET', '') or '').strip()
+        if not secret_key:
+            raise ValueError(
+                'Webhook signing requires an endpoint secret or WEBHOOK_SECRET to be set'
+            )
         payload_json = json.dumps(payload, sort_keys=True)
         
         return hmac.new(

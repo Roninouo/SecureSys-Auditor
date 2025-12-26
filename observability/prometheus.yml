@@ -29,6 +29,12 @@ scrape_configs:
     static_configs:
       - targets: ['otel-collector:8889']
 
+  # Pushgateway (batch job metrics, e.g., backups)
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+
   # Django application metrics (via OTEL collector)
   - job_name: 'securesys-backend'
     static_configs:

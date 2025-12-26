@@ -399,7 +399,7 @@ migrate_scanning_data --rollback  # Revert changes
 - Webhook Tests: `tests/test_webhooks.py`
 
 ### Configuration Examples
-- Environment: `env.example`
+- Environment: `.env.example`
 - Keycloak: `keycloak/realm-export.json`
 - Grafana: `docs/grafana/`
 

@@ -2,6 +2,9 @@
 
 ## 1. Security
 - [ ] **Secrets Management**: `secrets.yaml.template` removed; ExternalSecrets/SealedSecrets configured.
+- [ ] **TLS Certificates**:
+	- **Kubernetes**: cert-manager installed and an `Issuer`/`ClusterIssuer` exists for the `Certificate` in `k8s/ingress/certificate.yaml`.
+	- **docker-compose.prod**: provide `nginx/ssl/fullchain.pem` and `nginx/ssl/privkey.pem` (see `nginx/ssl/README.md`). NGINX fails to start if missing.
 - [ ] **API Documentation**: Restricted to admin/internal networks in production.
 - [ ] **Network Policies**: Egress/Ingress rules configured (deny-all default).
 - [ ] **Container Security**: Images scanned (Trivy), non-root user enforced.

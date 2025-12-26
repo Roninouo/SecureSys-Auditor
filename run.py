@@ -705,10 +705,11 @@ class APITester:
             method="POST"
         )
         
-        # Test with demo credentials
+        # Test with optional credentials.
+        # Defaults intentionally do NOT include a real password.
         test_credentials = {
-            "username": "admin",
-            "password": "admin123"
+            "username": os.getenv("SECURESYS_TEST_USERNAME", "admin"),
+            "password": os.getenv("SECURESYS_TEST_PASSWORD", ""),
         }
         
         status_code, response, response_time, error = self._make_request(
