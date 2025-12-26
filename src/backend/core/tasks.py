@@ -5,6 +5,9 @@ import logging
 from celery import shared_task
 from django.utils import timezone
 
+# Import at module scope so tests can patch `core.tasks.SecurityAnalyzer`.
+from .analysis import SecurityAnalyzer
+
 logger = logging.getLogger('core')
 
 
@@ -22,7 +25,6 @@ def process_scan(self, scan_id: str):
     6. Creates recommendations
     """
     from .models import Scan, Finding, Recommendation
-    from .analysis import SecurityAnalyzer
     
     try:
         scan = Scan.objects.get(id=scan_id)

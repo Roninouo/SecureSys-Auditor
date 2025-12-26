@@ -13,6 +13,9 @@ import uuid
 from typing import Dict, Any
 
 
+pytestmark = pytest.mark.e2e
+
+
 class TestE2EWorkflow:
     """Test complete agent to frontend workflow."""
     
@@ -413,10 +416,7 @@ class TestE2EResilience:
             "Rate limiting should either trigger or allow all requests"
 
 
-@pytest.mark.skipif(
-    not pytest.config.getoption("--e2e"),
-    reason="E2E tests only run with --e2e flag"
-)
+@pytest.mark.e2e
 class TestE2ESmoke:
     """Smoke tests for production deployments."""
     
@@ -447,12 +447,3 @@ class TestE2ESmoke:
         )
         assert response.status_code == 200
 
-
-def pytest_addoption(parser):
-    """Add custom command-line options."""
-    parser.addoption(
-        "--e2e",
-        action="store_true",
-        default=False,
-        help="Run end-to-end tests"
-    )

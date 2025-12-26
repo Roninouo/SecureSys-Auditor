@@ -577,3 +577,13 @@ class SecurityMaturityAssessment(models.Model):
             }
         }
 
+
+    # Backward-compatible re-exports
+    # Some parts of the codebase (and tests) still reference webhook models via `core.models`.
+    try:
+        from webhooks.models import WebhookEndpoint, WebhookDelivery  # noqa: F401
+    except Exception:
+        # During partial startup/migrations, this import may fail.
+        WebhookEndpoint = None  # type: ignore[assignment]
+        WebhookDelivery = None  # type: ignore[assignment]
+

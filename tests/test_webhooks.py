@@ -187,7 +187,8 @@ class TestWebhookService:
         assert len(MockWebhookHandler.requests_received) > 0
         request = MockWebhookHandler.requests_received[-1]
         assert request['body']['event_type'] == "test.event"
-        assert 'X-SecureSys-Signature' in request['headers']
+        header_keys = {k.lower() for k in request['headers'].keys()}
+        assert 'x-securesys-signature' in header_keys
     
     def test_send_webhook_with_signature(self, mock_webhook_server):
         """Test webhook payload is correctly signed."""
@@ -205,7 +206,8 @@ class TestWebhookService:
         
         # Get the request
         request = MockWebhookHandler.requests_received[-1]
-        signature = request['headers']['X-Securesys-Signature']
+        headers_lower = {k.lower(): v for k, v in request['headers'].items()}
+        signature = headers_lower['x-securesys-signature']
         
         # Verify signature
         payload_json = json.dumps(request['body'], sort_keys=True)
@@ -282,7 +284,7 @@ class TestWebhookService:
         assert result['success'] is False
         assert result['error'] == 'rate_limited'
     
-    @patch('core.models.WebhookEndpoint.objects.filter')
+    @patch('webhooks.models.WebhookEndpoint.objects.filter')
     def test_send_to_all_endpoints(self, mock_filter, mock_webhook_server):
         """Test sending to all configured endpoints."""
         # Mock endpoint queryset
@@ -311,7 +313,7 @@ class TestWebhookService:
 class TestWebhookDeliveryTracking:
     """Test webhook delivery tracking."""
     
-    @patch('core.models.WebhookDelivery.objects.create')
+    @patch('webhooks.models.WebhookDelivery.objects.create')
     def test_record_delivery_attempt(self, mock_create):
         """Test recording webhook delivery attempts."""
         from core.webhook_service import WebhookDeliveryTracker
@@ -330,4 +332,4 @@ class TestWebhookDeliveryTracking:
         call_kwargs = mock_create.call_args[1]
         assert call_kwargs['endpoint_id'] == "test-endpoint"
         assert call_kwargs['status'] == 'success'
-        assert call_kwargs['http_status_code'] == 200
+        assert call_kwargs['status_code'] == 200

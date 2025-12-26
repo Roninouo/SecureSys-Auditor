@@ -10,8 +10,8 @@ import pytest
 
 # Add source directories to path
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR / 'src'))
 sys.path.insert(0, str(BASE_DIR / 'src' / 'backend'))
-sys.path.insert(0, str(BASE_DIR / 'src' / 'agent'))
 
 # Set Django settings before importing Django modules
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
@@ -22,12 +22,29 @@ import django
 django.setup()
 
 
-@pytest.fixture(scope='session')
-def django_db_setup():
-    """Setup database for session."""
-    pass
+def pytest_addoption(parser):
+    """Add custom command-line options."""
+    parser.addoption(
+        "--e2e",
+        action="store_true",
+        default=False,
+        help="Run end-to-end tests (requires running services)",
+    )
 
 
+def pytest_configure(config):
+    config.addinivalue_line("markers", "e2e: end-to-end tests")
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip E2E tests unless explicitly enabled."""
+    if config.getoption("--e2e"):
+        return
+
+    skip_e2e = pytest.mark.skip(reason="E2E tests only run with --e2e flag")
+    for item in items:
+        if "e2e" in item.keywords:
+            item.add_marker(skip_e2e)
 @pytest.fixture
 def sample_scan_payload():
     """Sample scan payload for testing analysis."""

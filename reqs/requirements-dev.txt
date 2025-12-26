@@ -4,6 +4,7 @@
 # Include base requirements
 -r requirements-base.txt
 -r requirements-async.txt
+-r requirements-agent.txt
 
 # Testing
 pytest>=7.4,<8.0

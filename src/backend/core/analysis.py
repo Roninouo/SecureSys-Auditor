@@ -395,6 +395,22 @@ class SecurityAnalyzer:
         Returns:
             Dict with findings, risk_score, maturity_level, and score_breakdown
         """
+        # If there's no scan data at all, do not emit findings.
+        # This keeps analysis resilient to partial/empty agent payloads.
+        if not self.payload:
+            score_breakdown = {
+                'critical': 0,
+                'high': 0,
+                'medium': 0,
+                'low': 0,
+            }
+            return {
+                'findings': [],
+                'risk_score': 0,
+                'maturity_level': self._determine_maturity(0),
+                'score_breakdown': score_breakdown,
+            }
+
         findings = []
         score_breakdown = {
             'critical': 0,
