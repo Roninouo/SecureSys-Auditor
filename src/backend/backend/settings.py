@@ -12,6 +12,20 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    return os.getenv(name, str(default)).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None or value == '':
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid integer for {name}: {value!r}") from exc
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -33,7 +47,7 @@ if IS_PRODUCTION and not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Default to False for security - must explicitly enable DEBUG
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = _env_bool('DEBUG', False)
 
 if IS_PRODUCTION and DEBUG:
     raise ValueError(
@@ -153,11 +167,11 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
@@ -209,10 +223,18 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = os.getenv(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'
-).split(',')
+CORS_ALLOWED_ORIGINS_ENV = os.getenv('CORS_ALLOWED_ORIGINS', '')
+if IS_PRODUCTION and not CORS_ALLOWED_ORIGINS_ENV:
+    raise ValueError(
+        "CORS_ALLOWED_ORIGINS environment variable is required in production. "
+        "Set it to a comma-separated list (e.g. https://app.example.com)."
+    )
+
+CORS_ALLOWED_ORIGINS = (
+    CORS_ALLOWED_ORIGINS_ENV.split(',')
+    if CORS_ALLOWED_ORIGINS_ENV
+    else 'http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000'.split(',')
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -293,6 +315,44 @@ LOGGING = {
 
 # Create logs directory
 (BASE_DIR / 'logs').mkdir(exist_ok=True)
+
+# =============================================================================
+# Production security hardening (Django SecurityMiddleware)
+# =============================================================================
+
+# When behind a reverse proxy (nginx/ingress), trust forwarded headers.
+USE_X_FORWARDED_HOST = _env_bool('USE_X_FORWARDED_HOST', IS_PRODUCTION)
+if _env_bool('USE_X_FORWARDED_PROTO', IS_PRODUCTION):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Redirect all HTTP -> HTTPS in production (unless explicitly disabled).
+SECURE_SSL_REDIRECT = _env_bool('SECURE_SSL_REDIRECT', IS_PRODUCTION)
+
+# HSTS
+SECURE_HSTS_SECONDS = _env_int('SECURE_HSTS_SECONDS', 31536000 if IS_PRODUCTION else 0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', IS_PRODUCTION)
+SECURE_HSTS_PRELOAD = _env_bool('SECURE_HSTS_PRELOAD', IS_PRODUCTION)
+
+# Common headers
+SECURE_CONTENT_TYPE_NOSNIFF = _env_bool('SECURE_CONTENT_TYPE_NOSNIFF', True)
+SECURE_REFERRER_POLICY = os.getenv('SECURE_REFERRER_POLICY', 'strict-origin-when-cross-origin')
+X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY' if IS_PRODUCTION else 'SAMEORIGIN')
+
+# =============================================================================
+# Cache (recommended: Redis in production)
+# =============================================================================
+REDIS_CACHE_URL = os.getenv('REDIS_CACHE_URL', '').strip()
+if REDIS_CACHE_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_CACHE_URL,
+            'OPTIONS': {
+                'socket_connect_timeout': 5,
+                'socket_timeout': 5,
+            },
+        }
+    }
 
 # =============================================================================
 # OIDC/Keycloak Configuration (Enterprise IAM)
