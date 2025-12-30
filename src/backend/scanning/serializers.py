@@ -5,6 +5,8 @@ Provides serialization for System, Scan, Finding, and Recommendation models
 with both full and lightweight list variants for efficient API responses.
 """
 from rest_framework import serializers
+from django.core.validators import URLValidator
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import System, Scan, Finding, Recommendation
 
 
@@ -20,7 +22,7 @@ class SystemSerializer(serializers.ModelSerializer):
     class Meta:
         model = System
         fields = [
-            'id', 'hostname', 'os', 'os_version', 'environment',
+            'id', 'system_type', 'hostname', 'url', 'os', 'os_version', 'environment',
             'ip_address', 'description', 'is_active',
             'created_at', 'updated_at', 'last_seen',
             'latest_risk_score', 'latest_maturity_level', 'scans_count'
@@ -40,7 +42,7 @@ class SystemListSerializer(serializers.ModelSerializer):
     class Meta:
         model = System
         fields = [
-            'id', 'hostname', 'os', 'environment',
+            'id', 'system_type', 'hostname', 'url', 'os', 'environment',
             'last_seen', 'latest_risk_score', 'latest_maturity_level'
         ]
 
@@ -51,9 +53,29 @@ class SystemCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = System
         fields = [
-            'hostname', 'os', 'os_version', 'environment',
+            'system_type', 'hostname', 'url', 'os', 'os_version', 'environment',
             'ip_address', 'description'
         ]
+
+    def validate(self, data):
+        """Validate that websites have URLs and servers have OS."""
+        system_type = data.get('system_type', System.SystemType.SERVER)
+        
+        if system_type == System.SystemType.WEBSITE:
+            if not data.get('url'):
+                raise serializers.ValidationError({
+                    'url': 'URL is required for website targets.'
+                })
+            # Set default OS for websites
+            if not data.get('os'):
+                data['os'] = 'Web'
+        else:
+            if not data.get('os'):
+                raise serializers.ValidationError({
+                    'os': 'Operating system is required for server targets.'
+                })
+        
+        return data
 
     def create(self, validated_data):
         # Check if system with same hostname exists
@@ -66,6 +88,58 @@ class SystemCreateSerializer(serializers.ModelSerializer):
             existing.save()
             return existing
         return super().create(validated_data)
+
+
+class WebsiteCreateSerializer(serializers.Serializer):
+    """Serializer for creating website targets."""
+    
+    url = serializers.URLField(max_length=500)
+    hostname = serializers.CharField(max_length=255, required=False)
+    environment = serializers.ChoiceField(
+        choices=System.Environment.choices,
+        default=System.Environment.DEVELOPMENT
+    )
+    description = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_url(self, value):
+        """Validate and normalize URL."""
+        if not value.startswith(('http://', 'https://')):
+            value = f'https://{value}'
+        
+        # Validate URL format
+        validator = URLValidator()
+        try:
+            validator(value)
+        except DjangoValidationError:
+            raise serializers.ValidationError('Invalid URL format.')
+        
+        return value
+    
+    def create(self, validated_data):
+        """Create or update a website system."""
+        url = validated_data['url']
+        
+        # Extract hostname from URL if not provided
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        hostname = validated_data.get('hostname') or parsed.netloc
+        
+        # Check if system with same URL exists
+        existing = System.objects.filter(url=url, is_active=True).first()
+        if existing:
+            existing.environment = validated_data.get('environment', existing.environment)
+            existing.description = validated_data.get('description', existing.description)
+            existing.save()
+            return existing
+        
+        return System.objects.create(
+            system_type=System.SystemType.WEBSITE,
+            hostname=hostname,
+            url=url,
+            os='Web',
+            environment=validated_data.get('environment', System.Environment.DEVELOPMENT),
+            description=validated_data.get('description', ''),
+        )
 
 
 # ============================================================================
@@ -258,3 +332,46 @@ class DashboardStatsSerializer(serializers.Serializer):
     systems_by_environment = serializers.DictField(
         child=serializers.IntegerField()
     )
+
+
+# ============================================================================
+# URL Scan Serializers
+# ============================================================================
+
+class URLScanSubmitSerializer(serializers.Serializer):
+    """Serializer for submitting a URL scan."""
+    
+    url = serializers.URLField(max_length=500)
+    environment = serializers.ChoiceField(
+        choices=System.Environment.choices,
+        default=System.Environment.DEVELOPMENT
+    )
+    description = serializers.CharField(required=False, allow_blank=True, default='')
+    
+    def validate_url(self, value):
+        """Validate and normalize URL."""
+        if not value.startswith(('http://', 'https://')):
+            value = f'https://{value}'
+        
+        # Validate URL format
+        validator = URLValidator()
+        try:
+            validator(value)
+        except DjangoValidationError:
+            raise serializers.ValidationError('Invalid URL format.')
+        
+        return value
+
+
+class URLScanResultSerializer(serializers.Serializer):
+    """Serializer for URL scan results."""
+    
+    scan_id = serializers.UUIDField()
+    system_id = serializers.UUIDField()
+    url = serializers.URLField()
+    status = serializers.CharField()
+    risk_score = serializers.IntegerField(allow_null=True)
+    maturity_level = serializers.CharField(allow_null=True)
+    findings_count = serializers.IntegerField()
+    scan_details = serializers.DictField(allow_null=True)
+

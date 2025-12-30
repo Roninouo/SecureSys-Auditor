@@ -6,7 +6,11 @@ import {
   CheckCircle,
   Clock,
   Shield,
-  ChevronRight
+  ChevronRight,
+  Globe,
+  Lock,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
@@ -51,6 +55,9 @@ export default function ScanDetailPage() {
     )
   }
 
+  const isUrlScan = scan.scan_type === 'url_scan'
+  const urlPayload = scan.scan_payload
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -61,7 +68,10 @@ export default function ScanDetailPage() {
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">Scan Results</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            {isUrlScan ? <Globe className="h-6 w-6" /> : <Shield className="h-6 w-6" />}
+            {isUrlScan ? 'Website Security Scan' : 'Scan Results'}
+          </h1>
           <p className="text-muted-foreground">
             {formatDateTime(scan.scan_date)}
           </p>
@@ -70,6 +80,67 @@ export default function ScanDetailPage() {
           {scan.status}
         </Badge>
       </div>
+
+      {/* URL Scan Info */}
+      {isUrlScan && urlPayload && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Scanned URL
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
+                  {urlPayload.url}
+                </span>
+                <a 
+                  href={urlPayload.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-600"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+              {urlPayload.final_url && urlPayload.final_url !== urlPayload.url && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <RefreshCw className="h-4 w-4" />
+                  Redirected to: <span className="font-mono">{urlPayload.final_url}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
+                <div>
+                  <span className="text-sm text-muted-foreground">Status Code</span>
+                  <div className={cn(
+                    "text-lg font-semibold",
+                    urlPayload.status_code >= 200 && urlPayload.status_code < 300 ? 'text-green-600' :
+                    urlPayload.status_code >= 400 ? 'text-red-600' : 'text-yellow-600'
+                  )}>
+                    {urlPayload.status_code}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">Response Time</span>
+                  <div className="text-lg font-semibold">
+                    {Math.round(urlPayload.response_time_ms)}ms
+                  </div>
+                </div>
+                {urlPayload.redirects && urlPayload.redirects.length > 0 && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Redirects</span>
+                    <div className="text-lg font-semibold">
+                      {urlPayload.redirects.length}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scan Overview */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -123,6 +194,143 @@ export default function ScanDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* SSL Information (for URL scans) */}
+      {isUrlScan && urlPayload?.ssl_info && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {urlPayload.ssl_info.is_valid ? (
+                <Lock className="h-5 w-5 text-green-600" />
+              ) : (
+                <Lock className="h-5 w-5 text-red-600" />
+              )}
+              SSL/TLS Certificate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <span className="text-sm text-muted-foreground">Status</span>
+                <div className="mt-1">
+                  <Badge className={urlPayload.ssl_info.is_valid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                    {urlPayload.ssl_info.is_valid ? 'Valid' : 'Invalid'}
+                  </Badge>
+                </div>
+              </div>
+              {urlPayload.ssl_info.days_until_expiry !== undefined && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Expires In</span>
+                  <div className={cn(
+                    "text-lg font-semibold mt-1",
+                    urlPayload.ssl_info.days_until_expiry <= 30 ? 'text-red-600' :
+                    urlPayload.ssl_info.days_until_expiry <= 90 ? 'text-yellow-600' : 'text-green-600'
+                  )}>
+                    {urlPayload.ssl_info.days_until_expiry} days
+                  </div>
+                </div>
+              )}
+              {urlPayload.ssl_info.protocol_version && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Protocol</span>
+                  <div className="text-lg font-semibold mt-1">
+                    {urlPayload.ssl_info.protocol_version}
+                  </div>
+                </div>
+              )}
+              {urlPayload.ssl_info.issuer && (
+                <div>
+                  <span className="text-sm text-muted-foreground">Issuer</span>
+                  <div className="text-sm mt-1 truncate" title={urlPayload.ssl_info.issuer}>
+                    {urlPayload.ssl_info.issuer.split(',')[0]}
+                  </div>
+                </div>
+              )}
+            </div>
+            {urlPayload.ssl_info.is_self_signed && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 rounded-lg">
+                <div className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="font-medium">Self-signed certificate detected</span>
+                </div>
+              </div>
+            )}
+            {urlPayload.ssl_info.errors && urlPayload.ssl_info.errors.length > 0 && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-lg">
+                <div className="text-red-700 dark:text-red-400 text-sm">
+                  {urlPayload.ssl_info.errors.map((err, i) => (
+                    <div key={i}>{err}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Security Headers (for URL scans) */}
+      {isUrlScan && urlPayload?.security_headers && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Security Headers</CardTitle>
+            <CardDescription>HTTP security headers analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {urlPayload.security_headers.missing_headers && urlPayload.security_headers.missing_headers.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-sm font-medium text-red-600 mb-2">Missing Headers</h4>
+                <div className="flex flex-wrap gap-2">
+                  {urlPayload.security_headers.missing_headers.map((header) => (
+                    <Badge key={header} variant="outline" className="text-red-600 border-red-300">
+                      {header}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid gap-2">
+              {urlPayload.security_headers.strict_transport_security && (
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="font-medium">Strict-Transport-Security</span>
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+              )}
+              {urlPayload.security_headers.content_security_policy && (
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="font-medium">Content-Security-Policy</span>
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                </div>
+              )}
+              {urlPayload.security_headers.x_frame_options && (
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="font-medium">X-Frame-Options</span>
+                  <span className="text-sm text-muted-foreground">{urlPayload.security_headers.x_frame_options}</span>
+                </div>
+              )}
+              {urlPayload.security_headers.x_content_type_options && (
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="font-medium">X-Content-Type-Options</span>
+                  <span className="text-sm text-muted-foreground">{urlPayload.security_headers.x_content_type_options}</span>
+                </div>
+              )}
+              {urlPayload.security_headers.referrer_policy && (
+                <div className="flex justify-between items-center p-2 bg-muted/50 rounded">
+                  <span className="font-medium">Referrer-Policy</span>
+                  <span className="text-sm text-muted-foreground">{urlPayload.security_headers.referrer_policy}</span>
+                </div>
+              )}
+            </div>
+            {urlPayload.security_headers.server && (
+              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 rounded-lg">
+                <div className="text-yellow-700 dark:text-yellow-400 text-sm">
+                  <span className="font-medium">Server header exposed: </span>
+                  {urlPayload.security_headers.server}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Score Breakdown */}
       {scan.score_breakdown && Object.keys(scan.score_breakdown).length > 0 && (() => {
@@ -183,7 +391,7 @@ export default function ScanDetailPage() {
                     <div>
                       <div className="font-medium">{finding.title}</div>
                       <div className="text-sm text-muted-foreground capitalize">
-                        {finding.category.replace('_', ' ')}
+                        {finding.category.replace(/_/g, ' ')}
                       </div>
                     </div>
                   </div>

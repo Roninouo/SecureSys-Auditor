@@ -4,6 +4,7 @@ URL configuration for the Scanning API.
 Routes:
 - /api/v1/scanning/systems/      System management
 - /api/v1/scanning/scans/        Scan management
+- /api/v1/scanning/scans/url/    URL/Website security scanning
 - /api/v1/scanning/findings/     Finding management
 - /api/v1/scanning/recommendations/ Recommendation access
 - /api/v1/scanning/dashboard/    Dashboard stats
@@ -19,6 +20,7 @@ from .views import (
     RecommendationViewSet,
     DashboardStatsView,
     ScanningHealthCheckView,
+    URLScanView,
 )
 
 # Create router and register viewsets
@@ -34,6 +36,9 @@ urlpatterns = [
     
     # Dashboard stats
     path('dashboard/stats/', DashboardStatsView.as_view(), name='scanning-dashboard-stats'),
+    
+    # URL/Website scanning
+    path('scans/url/', URLScanView.as_view(), name='scanning-url-scan'),
     
     # Router URLs
     path('', include(router.urls)),

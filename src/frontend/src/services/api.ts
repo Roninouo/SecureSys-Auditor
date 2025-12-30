@@ -228,6 +228,12 @@ export const scansApi = {
     const response = await scanningApi.get(`/scans/${scanId}/summary/`)
     return response.data
   },
+  
+  // URL/Website scanning
+  scanUrl: async (data: { url: string; environment?: string; description?: string }) => {
+    const response = await scanningApi.post('/scans/url/', data)
+    return response.data
+  },
 }
 
 // Findings API (uses new scanning module)

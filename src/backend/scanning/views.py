@@ -7,6 +7,7 @@ Provides REST API endpoints for:
 - Finding management (list, detail, resolve)
 - Recommendation management
 - Dashboard statistics
+- URL/Website security scanning
 """
 import logging
 from django.db.models import Count, Avg, Q
@@ -22,6 +23,7 @@ from .serializers import (
     SystemSerializer,
     SystemListSerializer,
     SystemCreateSerializer,
+    WebsiteCreateSerializer,
     ScanSerializer,
     ScanListSerializer,
     ScanSubmitSerializer,
@@ -31,6 +33,8 @@ from .serializers import (
     RecommendationSerializer,
     RecommendationListSerializer,
     DashboardStatsSerializer,
+    URLScanSubmitSerializer,
+    URLScanResultSerializer,
 )
 from .tasks import process_scan_task
 
@@ -424,6 +428,181 @@ class DashboardStatsView(APIView):
             'recent_scans': recent_scans_data,
             'systems_by_environment': systems_by_env,
         })
+
+
+# ============================================================================
+# URL Scan View
+# ============================================================================
+
+class URLScanView(APIView):
+    """
+    URL/Website security scanning endpoint.
+    
+    POST /api/scans/url/
+    Submits a URL for security scanning and returns results.
+    
+    The scan checks:
+    - HTTP security headers (HSTS, CSP, X-Frame-Options, etc.)
+    - SSL/TLS certificate validity and configuration
+    - Cookie security settings
+    - Server information disclosure
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Submit a URL for security scanning.
+        
+        Request body:
+        {
+            "url": "https://example.com",
+            "environment": "production",  // optional
+            "description": "Main website"  // optional
+        }
+        
+        Returns scan results with findings and recommendations.
+        """
+        serializer = URLScanSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        url = serializer.validated_data['url']
+        environment = serializer.validated_data.get('environment', System.Environment.DEVELOPMENT)
+        description = serializer.validated_data.get('description', '')
+        
+        logger.info(f"URL scan requested for: {url}")
+        
+        try:
+            # Import scanner and analyzer
+            from .scanners.url_scanner import URLScanner
+            from .url_rules import URLSecurityAnalyzer
+            from urllib.parse import urlparse
+            
+            # Extract hostname from URL
+            parsed = urlparse(url)
+            hostname = parsed.netloc
+            
+            # Get or create system for this URL
+            system, created = System.objects.get_or_create(
+                url=url,
+                is_active=True,
+                defaults={
+                    'system_type': System.SystemType.WEBSITE,
+                    'hostname': hostname,
+                    'os': 'Web',
+                    'environment': environment,
+                    'description': description,
+                }
+            )
+            
+            if not created:
+                # Update environment/description if provided
+                if environment:
+                    system.environment = environment
+                if description:
+                    system.description = description
+                system.save()
+            
+            # Create scan record
+            scan = Scan.objects.create(
+                system=system,
+                scan_type=Scan.ScanType.URL_SCAN,
+                status=Scan.Status.PROCESSING,
+                started_at=timezone.now(),
+            )
+            
+            # Perform the URL scan
+            scanner = URLScanner(timeout=30, verify_ssl=True)
+            scan_result = scanner.scan(url)
+            
+            # Store scan payload
+            scan.scan_payload = scan_result.to_dict()
+            
+            # Analyze results
+            analyzer = URLSecurityAnalyzer()
+            analysis_result = analyzer.analyze(scan_result.to_dict())
+            
+            # Create findings and recommendations
+            findings_created = self._create_findings(scan, analysis_result['findings'])
+            
+            # Update scan with results
+            scan.risk_score = analysis_result['risk_score']
+            scan.maturity_level = analysis_result['maturity_level']
+            scan.score_breakdown = analysis_result['score_breakdown']
+            scan.status = Scan.Status.COMPLETED
+            scan.completed_at = timezone.now()
+            scan.save()
+            
+            # Update system with latest scan data
+            system.latest_risk_score = analysis_result['risk_score']
+            system.latest_maturity_level = analysis_result['maturity_level']
+            system.last_seen = timezone.now()
+            system.save()
+            
+            logger.info(f"URL scan completed for {url}: risk_score={analysis_result['risk_score']}, findings={len(findings_created)}")
+            
+            return Response({
+                'scan_id': str(scan.id),
+                'system_id': str(system.id),
+                'url': url,
+                'status': 'completed',
+                'risk_score': analysis_result['risk_score'],
+                'maturity_level': analysis_result['maturity_level'],
+                'findings_count': len(findings_created),
+                'score_breakdown': analysis_result['score_breakdown'],
+                'scan_details': {
+                    'final_url': scan_result.final_url,
+                    'status_code': scan_result.status_code,
+                    'response_time_ms': scan_result.response_time_ms,
+                    'ssl_valid': scan_result.ssl_info.is_valid if scan_result.ssl_info else None,
+                    'ssl_days_until_expiry': scan_result.ssl_info.days_until_expiry if scan_result.ssl_info else None,
+                    'missing_headers': scan_result.security_headers.missing_headers if scan_result.security_headers else [],
+                    'redirects': scan_result.redirects,
+                    'errors': scan_result.errors,
+                },
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"URL scan failed for {url}: {str(e)}")
+            
+            # If scan was created, mark it as failed
+            if 'scan' in locals():
+                scan.status = Scan.Status.FAILED
+                scan.error_message = str(e)
+                scan.completed_at = timezone.now()
+                scan.save()
+            
+            return Response({
+                'error': 'URL scan failed',
+                'detail': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _create_findings(self, scan, findings_data):
+        """Create Finding and Recommendation records from analysis results."""
+        findings = []
+        
+        for finding_data in findings_data:
+            finding = Finding.objects.create(
+                scan=scan,
+                category=finding_data['category'],
+                severity=finding_data['severity'],
+                title=finding_data['title'],
+                description=finding_data['description'],
+                evidence=finding_data.get('evidence', {}),
+            )
+            findings.append(finding)
+            
+            # Create recommendations
+            for rec_data in finding_data.get('recommendations', []):
+                Recommendation.objects.create(
+                    finding=finding,
+                    priority=rec_data.get('priority', 'medium'),
+                    effort=rec_data.get('effort', 'medium'),
+                    title=rec_data['title'],
+                    description=rec_data['description'],
+                    steps=rec_data.get('steps', []),
+                )
+        
+        return findings
 
 
 # ============================================================================

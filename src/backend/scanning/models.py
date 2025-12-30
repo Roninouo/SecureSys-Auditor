@@ -17,8 +17,12 @@ from django.utils import timezone
 
 class System(models.Model):
     """
-    Represents a monitored machine/system.
+    Represents a monitored machine/system or website.
     """
+    
+    class SystemType(models.TextChoices):
+        SERVER = 'server', 'Server'
+        WEBSITE = 'website', 'Website'
     
     class Environment(models.TextChoices):
         DEVELOPMENT = 'development', 'Development'
@@ -27,7 +31,14 @@ class System(models.Model):
         TESTING = 'testing', 'Testing'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    system_type = models.CharField(
+        max_length=20,
+        choices=SystemType.choices,
+        default=SystemType.SERVER,
+        db_index=True
+    )
     hostname = models.CharField(max_length=255, db_index=True)
+    url = models.URLField(max_length=500, blank=True, help_text='URL for website targets')
     os = models.CharField(max_length=255, verbose_name='Operating System')
     os_version = models.CharField(max_length=100, blank=True)
     environment = models.CharField(
@@ -55,9 +66,12 @@ class System(models.Model):
             models.Index(fields=['hostname']),
             models.Index(fields=['environment']),
             models.Index(fields=['last_seen']),
+            models.Index(fields=['system_type']),
         ]
 
     def __str__(self):
+        if self.system_type == self.SystemType.WEBSITE:
+            return f"{self.hostname} ({self.url})"
         return f"{self.hostname} ({self.os})"
 
     def update_last_seen(self):
@@ -88,6 +102,7 @@ class Scan(models.Model):
         QUICK = 'quick', 'Quick Scan'
         COMPLIANCE = 'compliance', 'Compliance Scan'
         VULNERABILITY = 'vulnerability', 'Vulnerability Scan'
+        URL_SCAN = 'url_scan', 'URL/Website Scan'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     system = models.ForeignKey(
@@ -200,6 +215,9 @@ class Finding(models.Model):
         AUTHENTICATION = 'authentication', 'Authentication'
         ENCRYPTION = 'encryption', 'Encryption'
         LOGGING = 'logging', 'Logging'
+        WEB_SECURITY = 'web_security', 'Web Security'
+        SSL_TLS = 'ssl_tls', 'SSL/TLS'
+        HTTP_HEADERS = 'http_headers', 'HTTP Headers'
         OTHER = 'other', 'Other'
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

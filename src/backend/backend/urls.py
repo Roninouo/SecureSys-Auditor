@@ -18,12 +18,18 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from observability.views import MetricsView
+
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
     
     # Health checks (outside /api/v1/ for load balancer compatibility)
     path('health/', include('observability.urls')),
+
+    # Prometheus metrics (backwards-compatible alias)
+    path('api/v1/metrics/prometheus', MetricsView.as_view(), name='metrics-prometheus'),
+    path('api/v1/metrics/prometheus/', MetricsView.as_view(), name='metrics-prometheus-slash'),
     
     # API Documentation - always available
     path('api/', include('backend.api_docs')),
