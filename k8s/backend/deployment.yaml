@@ -51,7 +51,7 @@ spec:
       # Init container for migrations
       initContainers:
         - name: migrate
-          image: securesys/backend:latest
+          image: securesys/backend
           imagePullPolicy: Always
           command: ["python", "manage.py", "migrate", "--noinput"]
           envFrom:
@@ -59,6 +59,41 @@ spec:
                 name: securesys-config
             - secretRef:
                 name: securesys-secrets
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        - name: collectstatic
+          image: securesys/backend
+          imagePullPolicy: Always
+          command: ["python", "manage.py", "collectstatic", "--noinput"]
+          envFrom:
+            - configMapRef:
+                name: securesys-config
+            - secretRef:
+                name: securesys-secrets
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+            - name: static
+              mountPath: /app/staticfiles
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -75,7 +110,7 @@ spec:
       
       containers:
         - name: backend
-          image: securesys/backend:latest
+          image: securesys/backend
           imagePullPolicy: Always
           
           ports:
@@ -115,6 +150,8 @@ spec:
               mountPath: /app/logs
             - name: static
               mountPath: /app/staticfiles
+            - name: media
+              mountPath: /app/media
           
           # Probes
           livenessProbe:
@@ -155,6 +192,8 @@ spec:
         - name: logs
           emptyDir: {}
         - name: static
+          emptyDir: {}
+        - name: media
           emptyDir: {}
       
       # Topology spread for HA

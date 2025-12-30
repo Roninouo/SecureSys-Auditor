@@ -22,9 +22,7 @@ spec:
         app: securesys-worker
         app.kubernetes.io/name: securesys-auditor
         app.kubernetes.io/component: worker
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+      annotations: {}
     spec:
       serviceAccountName: securesys-backend
       terminationGracePeriodSeconds: 120  # Allow time for task completion

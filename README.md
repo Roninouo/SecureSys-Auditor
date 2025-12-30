@@ -319,6 +319,18 @@ Copy `.env.example` to `.env` and configure the required variables:
 cp .env.example .env
 ```
 
+### Production (Docker Compose)
+
+Use the production template and TLS-enabled compose file:
+
+```powershell
+Copy-Item .env.production.example .env.production
+docker-compose --env-file .env.production -f docker-compose.prod.yml up -d
+```
+
+TLS certificates are required for production compose:
+- [nginx/ssl/README.md](nginx/ssl/README.md)
+
 #### Required in Production
 
 | Variable | Description | Example |

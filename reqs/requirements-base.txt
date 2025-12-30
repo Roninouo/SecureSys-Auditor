@@ -42,3 +42,6 @@ opentelemetry-instrumentation-redis>=0.43b0
 # HTTP Client (for OIDC, webhooks)
 requests>=2.31,<3.0
 httpx>=0.25,<1.0
+
+# Static files in production
+whitenoise>=6.6,<7.0

@@ -52,15 +52,29 @@ kubectl apply -k k8s/
 
 ### 2. Configure secrets
 
-Before deploying, create the required secrets:
+Before deploying, create the required secrets.
+
+If you use ExternalSecrets, configure [k8s/base/external-secret.yaml](k8s/base/external-secret.yaml).
+
+If you don't have ExternalSecrets/SealedSecrets available, use the local template:
+
+- [k8s/base/secrets.local.yaml.template](k8s/base/secrets.local.yaml.template)
+
+Example (manual creation):
 
 ```bash
-# Create secrets from env file
 kubectl create secret generic securesys-secrets \
-  --from-literal=DJANGO_SECRET_KEY=$(openssl rand -base64 32) \
-  --from-literal=DB_PASSWORD=<your-db-password> \
-  --from-literal=WEBHOOK_SECRET=$(openssl rand -hex 32) \
+  --from-literal=DJANGO_SECRET_KEY=<generated> \
+  --from-literal=DB_USER=securesys_user \
+  --from-literal=DB_PASSWORD=<db-password> \
+  --from-literal=WEBHOOK_SECRET=<generated> \
   -n securesys
+```
+
+Windows helper script:
+
+```powershell
+./scripts/k8s-bootstrap.ps1
 ```
 
 ### 3. Deploy application

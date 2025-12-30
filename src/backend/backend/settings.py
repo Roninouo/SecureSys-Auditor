@@ -9,8 +9,17 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables.
+# When running Django from src/backend, the repo-root .env is not in the CWD,
+# so explicitly try common locations.
+_settings_path = Path(__file__).resolve()
+_dotenv_candidates = [
+    _settings_path.parents[3] / '.env',  # repo root
+    _settings_path.parents[1] / '.env',  # src/backend/.env (optional)
+]
+for _dotenv_path in _dotenv_candidates:
+    if _dotenv_path.exists():
+        load_dotenv(dotenv_path=_dotenv_path, override=False)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -96,6 +105,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -149,6 +159,16 @@ if IS_TESTING:
         }
     }
 
+# Optional local-dev mode: allow running without Postgres/Docker.
+# Enable with USE_SQLITE=true.
+if not IS_PRODUCTION and not IS_TESTING and _env_bool('USE_SQLITE', False):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'dev_db.sqlite3',
+        }
+    }
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -169,6 +189,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+if IS_PRODUCTION:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'

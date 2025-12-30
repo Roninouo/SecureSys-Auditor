@@ -24,6 +24,11 @@ resources:
   - worker/deployment.yaml
   - worker/hpa.yaml
   - worker/pdb.yaml
+
+  # Frontend
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - frontend/hpa.yaml
   
   # Ingress
   - ingress/ingress.yaml

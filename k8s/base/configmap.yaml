@@ -22,6 +22,14 @@ data:
   
   # Redis
   CELERY_BROKER_URL: "redis://redis.securesys.svc.cluster.local:6379/0"
+
+  # Security hardening (SecurityMiddleware)
+  USE_X_FORWARDED_HOST: "true"
+  USE_X_FORWARDED_PROTO: "true"
+  SECURE_SSL_REDIRECT: "true"
+  SECURE_HSTS_SECONDS: "31536000"
+  SECURE_HSTS_INCLUDE_SUBDOMAINS: "true"
+  SECURE_HSTS_PRELOAD: "true"
   
   # OIDC/Keycloak
   OIDC_ENABLED: "true"

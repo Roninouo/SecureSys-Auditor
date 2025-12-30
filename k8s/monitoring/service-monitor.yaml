@@ -19,24 +19,3 @@ spec:
       interval: 30s
       scrapeTimeout: 10s
       honorLabels: true
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: securesys-celery
-  namespace: securesys
-  labels:
-    app.kubernetes.io/name: securesys-auditor
-    release: prometheus
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/component: worker
-  namespaceSelector:
-    matchNames:
-      - securesys
-  endpoints:
-    - port: metrics
-      path: /metrics
-      interval: 30s
-      scrapeTimeout: 10s

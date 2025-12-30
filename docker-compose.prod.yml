@@ -29,7 +29,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # conf.d not required; nginx.conf is the main config
       - backend_static:/var/www/static:ro
       - backend_media:/var/www/media:ro
     entrypoint: ["/bin/sh", "-c"]

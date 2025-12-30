@@ -9,6 +9,22 @@ from rest_framework.views import APIView
 from django.db import connection
 
 
+def _prometheus_metrics_response():
+    try:
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    except Exception:
+        return Response(
+            {'detail': 'Prometheus client not installed'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    payload = generate_latest()
+    # DRF Response tries to serialize bytes -> use raw HttpResponse.
+    from django.http import HttpResponse
+
+    return HttpResponse(payload, content_type=CONTENT_TYPE_LATEST)
+
+
 class HealthCheckView(APIView):
     """
     Basic health check endpoint.
@@ -94,3 +110,12 @@ class LivenessCheckView(APIView):
     
     def get(self, request):
         return Response({'status': 'alive'})
+
+
+class MetricsView(APIView):
+    """Prometheus scrape endpoint."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return _prometheus_metrics_response()
