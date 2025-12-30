@@ -67,6 +67,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: securesys-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
@@ -119,7 +136,7 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       - DEBUG=${DEBUG:-False}
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1},backend
       - DB_NAME=${DB_NAME:-securesys_db}
       - DB_USER=${DB_USER:-securesys_user}
       - DB_PASSWORD=${DB_PASSWORD:?Set DB_PASSWORD in .env}
@@ -261,6 +278,8 @@ volumes:
   backend_media:
     driver: local
   backend_logs:
+    driver: local
+  prometheus_data:
     driver: local
 
 networks:

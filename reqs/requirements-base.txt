@@ -39,6 +39,9 @@ opentelemetry-instrumentation-celery>=0.43b0
 opentelemetry-instrumentation-psycopg2>=0.43b0
 opentelemetry-instrumentation-redis>=0.43b0
 
+# Prometheus metrics endpoint support
+prometheus-client>=0.19,<1.0
+
 # HTTP Client (for OIDC, webhooks)
 requests>=2.31,<3.0
 httpx>=0.25,<1.0
