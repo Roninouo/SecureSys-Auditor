@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { 
@@ -26,8 +27,88 @@ import {
 } from '@/lib/utils'
 import type { Scan, Finding } from '@/types'
 
+type FindingGuidance = {
+  explanation: string
+  impact: string
+  remediation: string[]
+  verification: string[]
+}
+
+function buildFindingGuidance(finding: Finding): FindingGuidance {
+  const severityImpact: Record<Finding['severity'], string> = {
+    critical: 'Impacto muy alto: puede exponer datos sensibles o permitir compromiso del sistema.',
+    high: 'Impacto alto: aumenta significativamente el riesgo de explotación o fuga de información.',
+    medium: 'Impacto medio: debilita controles y facilita ataques en ciertos escenarios.',
+    low: 'Impacto bajo: reduce la postura de seguridad o filtra información no crítica.',
+  }
+
+  const base: FindingGuidance = {
+    explanation: finding.description || 'Se detectó una condición que puede debilitar la seguridad.',
+    impact: severityImpact[finding.severity],
+    remediation: [],
+    verification: [],
+  }
+
+  const title = (finding.title || '').toLowerCase()
+  const category = finding.category
+
+  // Prefer structured recommendations if present.
+  if (finding.recommendations && finding.recommendations.length > 0) {
+    const top = finding.recommendations[0]
+    const steps = (top.steps || []).filter(Boolean)
+    base.remediation = [top.description, ...steps].filter(Boolean)
+    if (top.references && top.references.length > 0) {
+      base.verification = ['Revisar referencias provistas y re-ejecutar el escaneo para confirmar la corrección.']
+    }
+    return base
+  }
+
+  // Curated guidance for common web findings (matches the screenshot examples).
+  if (title.includes('cookie') || category === 'web_security') {
+    base.explanation =
+      'Las cookies detectadas no cumplen con atributos recomendados (por ejemplo: Secure, HttpOnly y/o SameSite). Esto incrementa la superficie de ataque (robo de sesión, XSS/CSRF, fuga por transporte inseguro).'
+    base.remediation = [
+      'Marcar cookies de sesión/autenticación con `Secure` (solo por HTTPS).',
+      'Agregar `HttpOnly` para evitar acceso desde JavaScript (mitiga impacto de XSS).',
+      'Definir `SameSite=Lax` (o `Strict` donde sea viable) y usar `SameSite=None` solo si es necesario y siempre con `Secure`.',
+      'Restringir `Domain` y `Path` al mínimo necesario.',
+      'Evitar cookies persistentes para sesión si no es requerido (controlar `Expires/Max-Age`).',
+    ]
+    base.verification = [
+      'Verificar respuestas HTTP y encabezados `Set-Cookie` (en DevTools o con `curl -I`) para confirmar atributos.',
+      'Repetir el escaneo y validar que el finding desaparece.',
+    ]
+    return base
+  }
+
+  if (title.includes('server information') || title.includes('information disclosure') || category === 'configuration') {
+    base.explanation =
+      'El servidor está revelando información de versión/tecnología mediante headers o banners (por ejemplo `Server`, `X-Powered-By`). Esto ayuda a un atacante a perfilar el stack y buscar exploits específicos.'
+    base.remediation = [
+      'Deshabilitar/anonimizar headers de identificación (p. ej. remover `Server` y `X-Powered-By`).',
+      'Asegurar que páginas de error no expongan stack traces ni versiones.',
+      'Mantener componentes actualizados (servidor web, framework, runtime) para reducir exposición si se infiere el stack.',
+    ]
+    base.verification = [
+      'Ejecutar `curl -I https://tu-dominio` y confirmar que no se exponen headers sensibles.',
+      'Repetir el escaneo y validar la corrección.',
+    ]
+    return base
+  }
+
+  // Generic fallback.
+  base.remediation = [
+    'Aplicar hardening de configuración según el componente afectado.',
+    'Reducir la exposición de información innecesaria y seguir el principio de mínimo privilegio.',
+    'Re-ejecutar el escaneo para verificar la remediación.',
+  ]
+  base.verification = ['Revisar evidencia, aplicar cambios y volver a escanear para confirmar.']
+  return base
+}
+
 export default function ScanDetailPage() {
   const { scanId } = useParams<{ scanId: string }>()
+  const [expandedFindingId, setExpandedFindingId] = useState<string | null>(null)
 
   const { data: scan, isLoading } = useQuery<Scan>({
     queryKey: ['scan', scanId],
@@ -57,6 +138,12 @@ export default function ScanDetailPage() {
 
   const isUrlScan = scan.scan_type === 'url_scan'
   const urlPayload = scan.scan_payload
+
+  const guidanceByFindingId = useMemo(() => {
+    const map = new Map<string, FindingGuidance>()
+    ;(scan.findings || []).forEach((f) => map.set(f.id, buildFindingGuidance(f)))
+    return map
+  }, [scan.findings])
 
   return (
     <div className="space-y-6">
@@ -100,6 +187,8 @@ export default function ScanDetailPage() {
                   href={urlPayload.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
+                  aria-label="Open scanned URL in a new tab"
+                  title="Open scanned URL"
                   className="text-blue-500 hover:text-blue-600"
                 >
                   <ExternalLink className="h-4 w-4" />
@@ -373,39 +462,109 @@ export default function ScanDetailPage() {
           {scan.findings && scan.findings.length > 0 ? (
             <div className="space-y-4">
               {scan.findings.map((finding: Finding) => (
-                <div 
-                  key={finding.id}
-                  className="flex items-center justify-between p-4 rounded-lg border hover:border-primary transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg',
-                      getSeverityColor(finding.severity)
-                    )}>
-                      {finding.is_resolved ? (
-                        <CheckCircle className="h-5 w-5" />
-                      ) : (
-                        <AlertTriangle className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-medium">{finding.title}</div>
-                      <div className="text-sm text-muted-foreground capitalize">
-                        {finding.category.replace(/_/g, ' ')}
+                <div key={finding.id} className="rounded-lg border">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      setExpandedFindingId((prev) => (prev === finding.id ? null : finding.id))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        setExpandedFindingId((prev) => (prev === finding.id ? null : finding.id))
+                      }
+                    }}
+                    className="flex items-center justify-between p-4 hover:border-primary transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={cn(
+                          'flex h-10 w-10 items-center justify-center rounded-lg',
+                          getSeverityColor(finding.severity)
+                        )}
+                      >
+                        {finding.is_resolved ? (
+                          <CheckCircle className="h-5 w-5" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-medium">{finding.title}</div>
+                        <div className="text-sm text-muted-foreground capitalize">
+                          {finding.category.replace(/_/g, ' ')}
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-4">
+                      <Badge className={getSeverityColor(finding.severity)}>{finding.severity}</Badge>
+                      {finding.is_resolved && (
+                        <Badge variant="outline" className="text-green-600">
+                          Resolved
+                        </Badge>
+                      )}
+                      <ChevronRight
+                        className={cn(
+                          'h-5 w-5 text-muted-foreground transition-transform',
+                          expandedFindingId === finding.id && 'rotate-90'
+                        )}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge className={getSeverityColor(finding.severity)}>
-                      {finding.severity}
-                    </Badge>
-                    {finding.is_resolved && (
-                      <Badge variant="outline" className="text-green-600">
-                        Resolved
-                      </Badge>
-                    )}
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
+
+                  {expandedFindingId === finding.id && (() => {
+                    const guidance = guidanceByFindingId.get(finding.id)
+                    const evidence = finding.evidence
+                    const hasEvidence = evidence && Object.keys(evidence).length > 0
+                    return (
+                      <div className="px-4 pb-4">
+                        <div className="mt-2 rounded-lg bg-muted/40 p-4 space-y-3">
+                          <div>
+                            <div className="text-sm font-semibold">Explicación</div>
+                            <div className="text-sm text-muted-foreground">
+                              {guidance?.explanation}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold">Impacto</div>
+                            <div className="text-sm text-muted-foreground">{guidance?.impact}</div>
+                            {(finding.cvss_score !== undefined || finding.cwe_id) && (
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {finding.cwe_id ? `CWE: ${finding.cwe_id}` : ''}
+                                {finding.cwe_id && finding.cvss_score !== undefined ? ' • ' : ''}
+                                {finding.cvss_score !== undefined ? `CVSS: ${finding.cvss_score}` : ''}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold">Solución / Estrategia</div>
+                            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                              {(guidance?.remediation || []).map((step, idx) => (
+                                <li key={idx}>{step}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold">Verificación</div>
+                            <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                              {(guidance?.verification || []).map((step, idx) => (
+                                <li key={idx}>{step}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          {hasEvidence && (
+                            <div>
+                              <div className="text-sm font-semibold">Evidencia</div>
+                              <pre className="mt-2 text-xs bg-background/60 border rounded p-3 overflow-auto">
+                                {JSON.stringify(evidence, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
               ))}
             </div>
