@@ -210,7 +210,7 @@ export default function ScanListPage() {
           </p>
         </div>
         <ExportButton
-          data={filteredScans as Record<string, unknown>[]}
+          data={filteredScans as unknown as Record<string, unknown>[]}
           filename="securesys-scans"
           headers={exportHeaders as { key: keyof Record<string, unknown> | ((item: Record<string, unknown>) => string); label: string }[]}
         />

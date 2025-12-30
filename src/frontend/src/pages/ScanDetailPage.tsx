@@ -125,7 +125,9 @@ export default function ScanDetailPage() {
       </div>
 
       {/* Score Breakdown */}
-      {scan.score_breakdown && Object.keys(scan.score_breakdown).length > 0 && (
+      {scan.score_breakdown && Object.keys(scan.score_breakdown).length > 0 && (() => {
+        const scoreBreakdown = scan.score_breakdown
+        return (
         <Card>
           <CardHeader>
             <CardTitle>Severity Breakdown</CardTitle>
@@ -142,7 +144,7 @@ export default function ScanDetailPage() {
                     severity === 'medium' && 'text-yellow-600',
                     severity === 'low' && 'text-green-600',
                   )}>
-                    {scan.score_breakdown[severity] || 0}
+                    {scoreBreakdown?.[severity] ?? 0}
                   </div>
                   <div className="text-sm text-muted-foreground capitalize">{severity}</div>
                 </div>
@@ -150,7 +152,8 @@ export default function ScanDetailPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+        )
+      })()}
 
       {/* Findings List */}
       <Card>

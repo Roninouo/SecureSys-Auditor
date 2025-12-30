@@ -1,8 +1,6 @@
 # SecureSys Auditor - Local Development Docker Compose
 # Includes: PostgreSQL, Redis, Keycloak, Backend API, Celery Worker
 
-version: '3.9'
-
 services:
   # Keycloak IAM Server
   keycloak:
@@ -186,6 +184,12 @@ services:
       - ./src/backend:/app:ro
       - backend_logs:/app/logs
     command: celery -A backend worker --loglevel=info --concurrency=2
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A backend inspect ping -d celery@$$HOSTNAME || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
   # Celery Beat - Scheduled tasks (optional)
   celery-beat:
@@ -200,6 +204,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend:
+        condition: service_healthy
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       - DEBUG=${DEBUG:-False}
@@ -212,7 +218,15 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
     volumes:
       - ./src/backend:/app:ro
-    command: celery -A backend beat --loglevel=info
+      - backend_logs:/app/logs
+    command: celery -A backend beat --loglevel=info --scheduler=django_celery_beat.schedulers:DatabaseScheduler
+    healthcheck:
+      # Celery Beat doesn't respond to inspect ping, check if PID 1 (celery beat) is running
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
 
   # Frontend - React/Vite App
   frontend:
@@ -229,7 +243,7 @@ services:
     environment:
       - VITE_API_URL=http://localhost:${BACKEND_PORT:-8000}/api/v1
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
       interval: 30s
       timeout: 10s
       start_period: 10s

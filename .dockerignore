@@ -3,7 +3,10 @@
 
 # Allow specific directories and files
 !src/backend/**
+!src/frontend/**
 !reqs/**
+!docker/nginx.conf
+!Dockerfile.frontend
 
 # Exclude unnecessary files from allowed directories
 **/__pycache__

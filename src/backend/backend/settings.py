@@ -12,10 +12,23 @@ from dotenv import load_dotenv
 # Load environment variables.
 # When running Django from src/backend, the repo-root .env is not in the CWD,
 # so explicitly try common locations.
+# In Docker, the path is /app/backend/settings.py with fewer parent directories,
+# so we must handle IndexError gracefully.
 _settings_path = Path(__file__).resolve()
+
+def _safe_parent(path: Path, level: int) -> Path | None:
+    """Safely get a parent directory, returning None if level exceeds depth."""
+    try:
+        return path.parents[level]
+    except IndexError:
+        return None
+
 _dotenv_candidates = [
-    _settings_path.parents[3] / '.env',  # repo root
-    _settings_path.parents[1] / '.env',  # src/backend/.env (optional)
+    p / '.env' for p in [
+        _safe_parent(_settings_path, 3),  # repo root (local dev)
+        _safe_parent(_settings_path, 2),  # /app/.env (Docker)
+        _safe_parent(_settings_path, 1),  # src/backend/.env (optional)
+    ] if p is not None
 ]
 for _dotenv_path in _dotenv_candidates:
     if _dotenv_path.exists():
@@ -292,6 +305,30 @@ CELERY_TASK_ROUTES = {
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # Logging Configuration
+# Create logs directory first (will fail silently in read-only containers)
+_logs_dir = BASE_DIR / 'logs'
+try:
+    _logs_dir.mkdir(exist_ok=True)
+    _file_logging_available = _logs_dir.exists() and os.access(_logs_dir, os.W_OK)
+except (OSError, PermissionError):
+    _file_logging_available = False
+
+_handlers = {
+    'console': {
+        'class': 'logging.StreamHandler',
+        'formatter': 'verbose' if DEBUG else 'json',
+    },
+}
+
+if _file_logging_available:
+    _handlers['file'] = {
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': _logs_dir / 'securesys.log',
+        'maxBytes': 1024 * 1024 * 10,  # 10 MB
+        'backupCount': 5,
+        'formatter': 'json',
+    }
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -305,19 +342,7 @@ LOGGING = {
             'style': '{',
         },
     },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose' if DEBUG else 'json',
-        },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'securesys.log',
-            'maxBytes': 1024 * 1024 * 10,  # 10 MB
-            'backupCount': 5,
-            'formatter': 'json',
-        },
-    },
+    'handlers': _handlers,
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
@@ -329,15 +354,12 @@ LOGGING = {
             'propagate': False,
         },
         'core': {
-            'handlers': ['console', 'file'] if not DEBUG else ['console'],
+            'handlers': ['console', 'file'] if _file_logging_available and not DEBUG else ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
 }
-
-# Create logs directory
-(BASE_DIR / 'logs').mkdir(exist_ok=True)
 
 # =============================================================================
 # Production security hardening (Django SecurityMiddleware)

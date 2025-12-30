@@ -17,14 +17,12 @@ function StatCard({
   title, 
   value, 
   icon: Icon, 
-  description,
-  trend 
+  description
 }: { 
   title: string
   value: string | number
   icon: React.ElementType
   description?: string
-  trend?: 'up' | 'down' | 'neutral'
 }) {
   return (
     <Card>

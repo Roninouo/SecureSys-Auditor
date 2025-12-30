@@ -8,7 +8,13 @@
  * - Logout
  */
 
-import { User } from '../types'
+export interface AuthUser {
+  id: string
+  email: string
+  role: 'viewer' | 'auditor' | 'admin'
+  firstName?: string
+  lastName?: string
+}
 
 // OIDC Configuration from environment
 const OIDC_CONFIG = {
@@ -139,7 +145,7 @@ export class OIDCService {
   /**
    * Handle OIDC callback after authentication
    */
-  async handleCallback(callbackUrl: string): Promise<{ user: User; tokens: OIDCTokens }> {
+  async handleCallback(callbackUrl: string): Promise<{ user: AuthUser; tokens: OIDCTokens }> {
     const url = new URL(callbackUrl)
     const code = url.searchParams.get('code')
     const state = url.searchParams.get('state')
@@ -301,11 +307,11 @@ export class OIDCService {
   /**
    * Extract user info from ID token
    */
-  private extractUserFromToken(idToken: string): User {
+  private extractUserFromToken(idToken: string): AuthUser {
     const claims = parseJwt(idToken)
 
     // Extract role from realm_access or resource_access
-    let role = 'viewer'
+    let role: AuthUser['role'] = 'viewer'
     const realmRoles = claims.realm_access?.roles || []
     if (realmRoles.includes('admin')) {
       role = 'admin'
@@ -318,7 +324,7 @@ export class OIDCService {
       email: claims.email || claims.preferred_username,
       firstName: claims.given_name || '',
       lastName: claims.family_name || '',
-      role: role,
+      role,
     }
   }
 
@@ -363,7 +369,7 @@ export class OIDCService {
   /**
    * Get current user from stored tokens
    */
-  getCurrentUser(): User | null {
+  getCurrentUser(): AuthUser | null {
     const tokens = this.getStoredTokens()
     if (!tokens?.idToken) {
       return null

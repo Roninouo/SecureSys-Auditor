@@ -17,8 +17,7 @@ import {
   formatDateTime, 
   getRiskScoreColor, 
   getMaturityLevelColor,
-  getStatusColor,
-  getSeverityColor
+  getStatusColor
 } from '@/lib/utils'
 import type { System, Scan } from '@/types'
 
