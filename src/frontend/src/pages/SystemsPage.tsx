@@ -45,10 +45,23 @@ function Modal({
 
 export default function SystemsPage() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [showSynthetic, setShowSynthetic] = useState(true)
   const [isAddWebsiteOpen, setIsAddWebsiteOpen] = useState(false)
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [websiteEnv, setWebsiteEnv] = useState<'development' | 'staging' | 'production' | 'testing'>('production')
   const [websiteDesc, setWebsiteDesc] = useState('')
+
+  const isDev = import.meta.env.DEV
+
+  const isSyntheticSystem = (system: System): boolean => {
+    const description = (system.description || '').toLowerCase()
+    // Synthetic generator sets: "Auto-generated ... system for testing"
+    return (
+      description.includes('auto-generated') ||
+      description.includes('synthetic') ||
+      description.includes('for testing')
+    )
+  }
   
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -81,10 +94,18 @@ export default function SystemsPage() {
     })
   }
 
-  const filteredSystems = systems?.filter(system =>
+  const searchFiltered = systems?.filter(system =>
     system.hostname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     system.os.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (system.url && system.url.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
+
+  const syntheticCount = isDev
+    ? (searchFiltered || []).filter(isSyntheticSystem).length
+    : 0
+
+  const filteredSystems = (searchFiltered || []).filter((system) =>
+    !isDev || showSynthetic || !isSyntheticSystem(system)
   )
   
   // Separate servers and websites
@@ -132,14 +153,30 @@ export default function SystemsPage() {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search systems and websites..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search systems and websites..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        {isDev && syntheticCount > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              Synthetic systems detected: {syntheticCount}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSynthetic((prev) => !prev)}
+            >
+              {showSynthetic ? 'Hide synthetic' : 'Show synthetic'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Websites Section */}
@@ -306,8 +343,9 @@ export default function SystemsPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Website URL</label>
+            <label htmlFor="website-url" className="text-sm font-medium">Website URL</label>
             <Input
+              id="website-url"
               placeholder="https://example.com"
               value={websiteUrl}
               onChange={(e) => setWebsiteUrl(e.target.value)}
@@ -319,8 +357,9 @@ export default function SystemsPage() {
           </div>
           
           <div>
-            <label className="text-sm font-medium">Environment</label>
+            <label htmlFor="website-environment" className="text-sm font-medium">Environment</label>
             <select
+              id="website-environment"
               value={websiteEnv}
               onChange={(e) => setWebsiteEnv(e.target.value as typeof websiteEnv)}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -333,8 +372,9 @@ export default function SystemsPage() {
           </div>
           
           <div>
-            <label className="text-sm font-medium">Description (optional)</label>
+            <label htmlFor="website-description" className="text-sm font-medium">Description (optional)</label>
             <Input
+              id="website-description"
               placeholder="Main company website"
               value={websiteDesc}
               onChange={(e) => setWebsiteDesc(e.target.value)}
