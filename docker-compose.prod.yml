@@ -336,6 +336,8 @@ services:
     container_name: securesys-otel-collector
     restart: always
     command: ["--config=/etc/otel/config.yaml"]
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
     volumes:
       - ./observability/otel-collector-config.yaml:/etc/otel/config.yaml:ro
     ports:

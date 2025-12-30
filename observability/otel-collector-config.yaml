@@ -49,7 +49,7 @@ processors:
   resource:
     attributes:
       - key: deployment.environment
-        value: "${ENVIRONMENT:-production}"
+        value: "${env:ENVIRONMENT}"
         action: upsert
       - key: service.namespace
         value: securesys
