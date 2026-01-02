@@ -4,34 +4,61 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('scanning', '0001_initial'),
+        ("scanning", "0001_initial"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='system',
-            name='system_type',
-            field=models.CharField(choices=[('server', 'Server'), ('website', 'Website')], db_index=True, default='server', max_length=20),
+            model_name="system",
+            name="system_type",
+            field=models.CharField(
+                choices=[("server", "Server"), ("website", "Website")], db_index=True, default="server", max_length=20
+            ),
         ),
         migrations.AddField(
-            model_name='system',
-            name='url',
-            field=models.URLField(blank=True, help_text='URL for website targets', max_length=500),
+            model_name="system",
+            name="url",
+            field=models.URLField(blank=True, help_text="URL for website targets", max_length=500),
         ),
         migrations.AlterField(
-            model_name='finding',
-            name='category',
-            field=models.CharField(choices=[('access_control', 'Access Control'), ('configuration', 'Configuration'), ('patch_management', 'Patch Management'), ('network', 'Network'), ('authentication', 'Authentication'), ('encryption', 'Encryption'), ('logging', 'Logging'), ('web_security', 'Web Security'), ('ssl_tls', 'SSL/TLS'), ('http_headers', 'HTTP Headers'), ('other', 'Other')], db_index=True, max_length=30),
+            model_name="finding",
+            name="category",
+            field=models.CharField(
+                choices=[
+                    ("access_control", "Access Control"),
+                    ("configuration", "Configuration"),
+                    ("patch_management", "Patch Management"),
+                    ("network", "Network"),
+                    ("authentication", "Authentication"),
+                    ("encryption", "Encryption"),
+                    ("logging", "Logging"),
+                    ("web_security", "Web Security"),
+                    ("ssl_tls", "SSL/TLS"),
+                    ("http_headers", "HTTP Headers"),
+                    ("other", "Other"),
+                ],
+                db_index=True,
+                max_length=30,
+            ),
         ),
         migrations.AlterField(
-            model_name='scan',
-            name='scan_type',
-            field=models.CharField(choices=[('full', 'Full Scan'), ('quick', 'Quick Scan'), ('compliance', 'Compliance Scan'), ('vulnerability', 'Vulnerability Scan'), ('url_scan', 'URL/Website Scan')], default='full', max_length=20),
+            model_name="scan",
+            name="scan_type",
+            field=models.CharField(
+                choices=[
+                    ("full", "Full Scan"),
+                    ("quick", "Quick Scan"),
+                    ("compliance", "Compliance Scan"),
+                    ("vulnerability", "Vulnerability Scan"),
+                    ("url_scan", "URL/Website Scan"),
+                ],
+                default="full",
+                max_length=20,
+            ),
         ),
         migrations.AddIndex(
-            model_name='system',
-            index=models.Index(fields=['system_type'], name='scanning_sy_system__b78821_idx'),
+            model_name="system",
+            index=models.Index(fields=["system_type"], name="scanning_sy_system__b78821_idx"),
         ),
     ]

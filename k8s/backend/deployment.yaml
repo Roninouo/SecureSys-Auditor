@@ -29,14 +29,14 @@ spec:
     spec:
       serviceAccountName: securesys-backend
       terminationGracePeriodSeconds: 30
-      
+
       # Pod security context
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
-      
+
       # Anti-affinity: spread pods across nodes
       affinity:
         podAntiAffinity:
@@ -47,7 +47,7 @@ spec:
                   matchLabels:
                     app: securesys-backend
                 topologyKey: kubernetes.io/hostname
-      
+
       # Init container for migrations
       initContainers:
         - name: migrate
@@ -107,24 +107,24 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-      
+
       containers:
         - name: backend
           image: securesys/backend
           imagePullPolicy: Always
-          
+
           ports:
             - containerPort: 8000
               name: http
               protocol: TCP
-          
+
           # Environment variables
           envFrom:
             - configMapRef:
                 name: securesys-config
             - secretRef:
                 name: securesys-secrets
-          
+
           # Resource limits
           resources:
             requests:
@@ -133,7 +133,7 @@ spec:
             limits:
               cpu: 2000m
               memory: 2Gi
-          
+
           # Container security
           securityContext:
             allowPrivilegeEscalation: false
@@ -141,7 +141,7 @@ spec:
             capabilities:
               drop:
                 - ALL
-          
+
           # Volume mounts for writable directories
           volumeMounts:
             - name: tmp
@@ -152,7 +152,7 @@ spec:
               mountPath: /app/staticfiles
             - name: media
               mountPath: /app/media
-          
+
           # Probes
           livenessProbe:
             httpGet:
@@ -162,7 +162,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
-          
+
           readinessProbe:
             httpGet:
               path: /health/ready/
@@ -171,7 +171,7 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
-          
+
           startupProbe:
             httpGet:
               path: /health/live/
@@ -179,13 +179,13 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 30
-          
+
           # Lifecycle hooks
           lifecycle:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "sleep 10"]
-      
+
       volumes:
         - name: tmp
           emptyDir: {}
@@ -195,7 +195,7 @@ spec:
           emptyDir: {}
         - name: media
           emptyDir: {}
-      
+
       # Topology spread for HA
       topologySpreadConstraints:
         - maxSkew: 1

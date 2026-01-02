@@ -27,7 +27,12 @@ services:
       postgres-keycloak:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080;echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;if [ $? -eq 0 ]; then echo 'Healthcheck Successful';exit 0;else echo 'Healthcheck Failed';exit 1;fi;"]
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080;
+          echo -e 'GET /health/ready HTTP/1.1\r\nhost: localhost\r\nConnection: close\r\n\r\n' >&3;
+          if [ $? -eq 0 ]; then echo 'Healthcheck Successful'; exit 0; else echo 'Healthcheck Failed'; exit 1; fi;
       interval: 30s
       timeout: 10s
       retries: 5
@@ -79,6 +84,11 @@ services:
       - ./observability/otel-collector-config.yaml:/etc/otel/config.yaml:ro
     # Keep OTLP ports internal to the compose network to avoid host-port collisions.
     # Prometheus will scrape otel-collector:8889 over the internal network.
+    # Temporarily expose HTTP endpoints for local browsing / debugging. Remove these mappings when finished.
+    ports:
+      - "8889:8889"   # Prometheus metrics (temporary)
+      - "13133:13133" # Health endpoint (temporary)
+      - "55679:55679" # zPages (temporary)
 
   # Prometheus - Metrics collection
   prometheus:
@@ -96,6 +106,24 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
+
+  # Grafana - Dashboarding (local)
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: securesys-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docs/grafana:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3002}:3000"  # host port 3002 to avoid collisions
+    depends_on:
+      - prometheus
 
   # PostgreSQL Database
   postgres:
@@ -296,6 +324,8 @@ volumes:
   backend_logs:
     driver: local
   prometheus_data:
+    driver: local
+  grafana_data:
     driver: local
 
 networks:

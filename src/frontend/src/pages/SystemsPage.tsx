@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate } from 'react-router-dom'
-import { 
-  Plus, 
-  Search, 
-  Server, 
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  Plus,
+  Search,
+  Server,
   Globe,
   AlertTriangle,
   ChevronRight,
-  Loader2 
+  Loader2,
+  Trash2,
+  RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,22 +18,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { systemsApi, scansApi } from '@/services/api'
 import { cn, formatDateTime, getRiskScoreColor, getMaturityLevelColor } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 import type { System, URLScanResponse } from '@/types'
 
 // Simple Modal component
-function Modal({ 
-  isOpen, 
-  onClose, 
-  title, 
-  children 
-}: { 
+function Modal({
+  isOpen,
+  onClose,
+  title,
+  children
+}: {
   isOpen: boolean
   onClose: () => void
   title: string
-  children: React.ReactNode 
+  children: React.ReactNode
 }) {
   if (!isOpen) return null
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
@@ -47,11 +50,29 @@ export default function SystemsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showSynthetic, setShowSynthetic] = useState(true)
   const [isAddWebsiteOpen, setIsAddWebsiteOpen] = useState(false)
+  const [isAddServerOpen, setIsAddServerOpen] = useState(false)
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [websiteEnv, setWebsiteEnv] = useState<'development' | 'staging' | 'production' | 'testing'>('production')
   const [websiteDesc, setWebsiteDesc] = useState('')
 
+  // Server form state
+  const [serverHostname, setServerHostname] = useState('')
+  const [serverOS, setServerOS] = useState('')
+  const [serverEnv, setServerEnv] = useState<'development' | 'staging' | 'production' | 'testing'>('production')
+  const [serverDesc, setServerDesc] = useState('')
+  const [serverIP, setServerIP] = useState('')
+
+  const [searchParams] = useSearchParams()
+  const { addToast } = useToast()
+
   const isDev = import.meta.env.DEV
+
+  // Check if action=add is in URL params
+  useEffect(() => {
+    if (searchParams.get('action') === 'add') {
+      setIsAddServerOpen(true)
+    }
+  }, [searchParams])
 
   const isSyntheticSystem = (system: System): boolean => {
     const description = (system.description || '').toLowerCase()
@@ -62,27 +83,91 @@ export default function SystemsPage() {
       description.includes('for testing')
     )
   }
-  
+
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  
+
   const { data: systems, isLoading, error } = useQuery<System[]>({
     queryKey: ['systems'],
     queryFn: systemsApi.getAll,
   })
-  
+
   // URL scan mutation
   const urlScanMutation = useMutation({
-    mutationFn: (data: { url: string; environment: string; description: string }) => 
+    mutationFn: (data: { url: string; environment: string; description: string }) =>
       scansApi.scanUrl(data),
     onSuccess: (data: URLScanResponse) => {
       queryClient.invalidateQueries({ queryKey: ['systems'] })
       setIsAddWebsiteOpen(false)
       setWebsiteUrl('')
       setWebsiteDesc('')
+      addToast({
+        type: 'success',
+        title: 'Website añadido',
+        message: 'El escaneo de seguridad ha comenzado'
+      })
       // Navigate to scan results
       navigate(`/scans/${data.scan_id}`)
     },
+    onError: (error: Error) => {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'No se pudo escanear el website'
+      })
+    }
+  })
+
+  // Server creation mutation
+  const createServerMutation = useMutation({
+    mutationFn: (data: {
+      hostname: string
+      os: string
+      environment: string
+      description?: string
+      ip_address?: string
+    }) => systemsApi.create(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['systems'] })
+      setIsAddServerOpen(false)
+      setServerHostname('')
+      setServerOS('')
+      setServerDesc('')
+      setServerIP('')
+      addToast({
+        type: 'success',
+        title: 'Servidor añadido',
+        message: `${data.hostname} ha sido registrado exitosamente`
+      })
+      navigate(`/systems/${data.id}`)
+    },
+    onError: (error: Error) => {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'No se pudo registrar el servidor'
+      })
+    }
+  })
+
+  // Delete system mutation
+  const deleteSystemMutation = useMutation({
+    mutationFn: (id: string) => systemsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['systems'] })
+      addToast({
+        type: 'success',
+        title: 'Sistema eliminado',
+        message: 'El sistema ha sido eliminado correctamente'
+      })
+    },
+    onError: (error: Error) => {
+      addToast({
+        type: 'error',
+        title: 'Error',
+        message: error.message || 'No se pudo eliminar el sistema'
+      })
+    }
   })
 
   const handleAddWebsite = () => {
@@ -92,6 +177,25 @@ export default function SystemsPage() {
       environment: websiteEnv,
       description: websiteDesc,
     })
+  }
+
+  const handleAddServer = () => {
+    if (!serverHostname.trim() || !serverOS.trim()) return
+    createServerMutation.mutate({
+      hostname: serverHostname,
+      os: serverOS,
+      environment: serverEnv,
+      description: serverDesc || undefined,
+      ip_address: serverIP || undefined,
+    })
+  }
+
+  const handleDeleteSystem = (e: React.MouseEvent, systemId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (window.confirm('¿Estás seguro de que quieres eliminar este sistema?')) {
+      deleteSystemMutation.mutate(systemId)
+    }
   }
 
   const searchFiltered = systems?.filter(system =>
@@ -107,7 +211,7 @@ export default function SystemsPage() {
   const filteredSystems = (searchFiltered || []).filter((system) =>
     !isDev || showSynthetic || !isSyntheticSystem(system)
   )
-  
+
   // Separate servers and websites
   const servers = filteredSystems?.filter(s => s.system_type !== 'website') || []
   const websites = filteredSystems?.filter(s => s.system_type === 'website') || []
@@ -145,7 +249,7 @@ export default function SystemsPage() {
             <Globe className="mr-2 h-4 w-4" />
             Add Website
           </Button>
-          <Button>
+          <Button onClick={() => setIsAddServerOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Add Server
           </Button>
@@ -223,7 +327,7 @@ export default function SystemsPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="mt-4 flex items-center justify-between text-sm">
                       {system.latest_maturity_level && (
                         <Badge className={getMaturityLevelColor(system.latest_maturity_level)}>
@@ -287,7 +391,7 @@ export default function SystemsPage() {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="mt-4 flex items-center justify-between text-sm">
                       {system.latest_maturity_level && (
                         <Badge className={getMaturityLevelColor(system.latest_maturity_level)}>
@@ -325,7 +429,7 @@ export default function SystemsPage() {
                   <Globe className="mr-2 h-4 w-4" />
                   Add Website
                 </Button>
-                <Button>
+                <Button onClick={() => setIsAddServerOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Server
                 </Button>
@@ -336,8 +440,8 @@ export default function SystemsPage() {
       )}
 
       {/* Add Website Modal */}
-      <Modal 
-        isOpen={isAddWebsiteOpen} 
+      <Modal
+        isOpen={isAddWebsiteOpen}
         onClose={() => setIsAddWebsiteOpen(false)}
         title="Add Website for Security Scan"
       >
@@ -355,7 +459,7 @@ export default function SystemsPage() {
               Enter the full URL including https://
             </p>
           </div>
-          
+
           <div>
             <label htmlFor="website-environment" className="text-sm font-medium">Environment</label>
             <select
@@ -370,7 +474,7 @@ export default function SystemsPage() {
               <option value="testing">Testing</option>
             </select>
           </div>
-          
+
           <div>
             <label htmlFor="website-description" className="text-sm font-medium">Description (optional)</label>
             <Input
@@ -381,18 +485,18 @@ export default function SystemsPage() {
               className="mt-1"
             />
           </div>
-          
+
           {urlScanMutation.isError && (
             <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded">
               {(urlScanMutation.error as Error)?.message || 'Failed to scan website'}
             </div>
           )}
-          
+
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setIsAddWebsiteOpen(false)}>
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleAddWebsite}
               disabled={!websiteUrl.trim() || urlScanMutation.isPending}
             >
@@ -405,6 +509,112 @@ export default function SystemsPage() {
                 <>
                   <Globe className="mr-2 h-4 w-4" />
                   Scan Website
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Server Modal */}
+      <Modal
+        isOpen={isAddServerOpen}
+        onClose={() => setIsAddServerOpen(false)}
+        title="Add New Server"
+      >
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="server-hostname" className="text-sm font-medium">Hostname *</label>
+            <Input
+              id="server-hostname"
+              placeholder="server-01.example.com"
+              value={serverHostname}
+              onChange={(e) => setServerHostname(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="server-os" className="text-sm font-medium">Operating System *</label>
+            <select
+              id="server-os"
+              value={serverOS}
+              onChange={(e) => setServerOS(e.target.value)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Select OS...</option>
+              <option value="Ubuntu Server">Ubuntu Server</option>
+              <option value="CentOS Stream">CentOS Stream</option>
+              <option value="Rocky Linux">Rocky Linux</option>
+              <option value="Amazon Linux">Amazon Linux</option>
+              <option value="Debian">Debian</option>
+              <option value="Windows Server">Windows Server</option>
+              <option value="RHEL">Red Hat Enterprise Linux</option>
+              <option value="Alpine Linux">Alpine Linux</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="server-environment" className="text-sm font-medium">Environment</label>
+            <select
+              id="server-environment"
+              value={serverEnv}
+              onChange={(e) => setServerEnv(e.target.value as typeof serverEnv)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="production">Production</option>
+              <option value="staging">Staging</option>
+              <option value="development">Development</option>
+              <option value="testing">Testing</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="server-ip" className="text-sm font-medium">IP Address (optional)</label>
+            <Input
+              id="server-ip"
+              placeholder="192.168.1.100"
+              value={serverIP}
+              onChange={(e) => setServerIP(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="server-description" className="text-sm font-medium">Description (optional)</label>
+            <Input
+              id="server-description"
+              placeholder="Primary application server"
+              value={serverDesc}
+              onChange={(e) => setServerDesc(e.target.value)}
+              className="mt-1"
+            />
+          </div>
+
+          {createServerMutation.isError && (
+            <div className="text-sm text-red-500 bg-red-50 dark:bg-red-950 p-3 rounded">
+              {(createServerMutation.error as Error)?.message || 'Failed to add server'}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setIsAddServerOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddServer}
+              disabled={!serverHostname.trim() || !serverOS.trim() || createServerMutation.isPending}
+            >
+              {createServerMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Server className="mr-2 h-4 w-4" />
+                  Add Server
                 </>
               )}
             </Button>

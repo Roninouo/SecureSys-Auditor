@@ -262,13 +262,13 @@ These checks are integrated into CI/CD:
   run: |
     # Static analysis
     bandit -r src/ -ll
-    
+
     # Dependency check
     safety check
-    
+
     # Secret detection
     gitleaks detect --exit-code 1
-    
+
     # Docker image scan
     trivy image $IMAGE_NAME --exit-code 1 --severity CRITICAL,HIGH
 ```

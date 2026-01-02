@@ -16,9 +16,8 @@ Usage:
 """
 
 import os
-import sys
 import random
-import uuid
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -30,12 +29,15 @@ sys.path.insert(0, str(backend_dir))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 
 import django
+
 django.setup()
+
+from scanning.models import Finding, Recommendation, Scan, System
+
+from django.contrib.auth import get_user_model
 
 # Now import Django models
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from scanning.models import System, Scan, Finding, Recommendation
 
 User = get_user_model()
 
@@ -44,11 +46,26 @@ User = get_user_model()
 # =============================================================================
 
 HOSTNAMES = [
-    "web-server-prod-{}", "api-gateway-{}", "database-master-{}", "database-replica-{}",
-    "cache-server-{}", "load-balancer-{}", "monitoring-server-{}", "ci-cd-runner-{}",
-    "file-storage-{}", "auth-server-{}", "email-server-{}", "backup-server-{}",
-    "logging-server-{}", "analytics-server-{}", "worker-node-{}", "scheduler-{}",
-    "proxy-server-{}", "vpn-gateway-{}", "dns-server-{}", "container-host-{}"
+    "web-server-prod-{}",
+    "api-gateway-{}",
+    "database-master-{}",
+    "database-replica-{}",
+    "cache-server-{}",
+    "load-balancer-{}",
+    "monitoring-server-{}",
+    "ci-cd-runner-{}",
+    "file-storage-{}",
+    "auth-server-{}",
+    "email-server-{}",
+    "backup-server-{}",
+    "logging-server-{}",
+    "analytics-server-{}",
+    "worker-node-{}",
+    "scheduler-{}",
+    "proxy-server-{}",
+    "vpn-gateway-{}",
+    "dns-server-{}",
+    "container-host-{}",
 ]
 
 OPERATING_SYSTEMS = [
@@ -63,10 +80,7 @@ OPERATING_SYSTEMS = [
 
 ENVIRONMENTS = ["development", "staging", "production", "testing"]
 
-IP_PREFIXES = [
-    "10.0.1.", "10.0.2.", "10.0.3.", "192.168.1.", "192.168.10.", 
-    "172.16.0.", "172.16.1.", "172.17.0."
-]
+IP_PREFIXES = ["10.0.1.", "10.0.2.", "10.0.3.", "192.168.1.", "192.168.10.", "172.16.0.", "172.16.1.", "172.17.0."]
 
 SCAN_TYPES = ["full", "quick", "compliance", "vulnerability"]
 
@@ -234,7 +248,7 @@ RECOMMENDATION_TEMPLATES = {
             "Schedule maintenance window for production deployment",
             "Apply patches to production systems",
             "Verify successful patching and restart affected services",
-            "Document the changes in change management system"
+            "Document the changes in change management system",
         ],
         "script_bash": "#!/bin/bash\nsudo apt update && sudo apt upgrade -y\nsudo systemctl restart affected-service",
         "script_powershell": "# Windows Update\nInstall-WindowsUpdate -AcceptAll -AutoReboot",
@@ -249,7 +263,7 @@ RECOMMENDATION_TEMPLATES = {
             "Test configuration changes in non-production",
             "Apply hardening configurations",
             "Verify system functionality after changes",
-            "Update configuration documentation"
+            "Update configuration documentation",
         ],
         "script_bash": "#!/bin/bash\n# Disable unnecessary services\nsudo systemctl disable cups\nsudo systemctl stop cups",
         "script_powershell": "# Disable unnecessary Windows features\nDisable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol",
@@ -264,7 +278,7 @@ RECOMMENDATION_TEMPLATES = {
             "Implement MFA for privileged accounts",
             "Enable audit logging for authentication events",
             "Test authentication flows",
-            "Communicate password policy changes to users"
+            "Communicate password policy changes to users",
         ],
         "script_bash": "#!/bin/bash\n# Configure PAM password requirements\nsudo apt install libpam-pwquality -y",
         "script_powershell": "# Set password policy\nSet-ADDefaultDomainPasswordPolicy -MinPasswordLength 14 -ComplexityEnabled $true",
@@ -279,7 +293,7 @@ RECOMMENDATION_TEMPLATES = {
             "Configure TLS 1.3 or TLS 1.2 minimum",
             "Enable encryption for database connections",
             "Implement disk encryption for sensitive data",
-            "Verify encryption configuration"
+            "Verify encryption configuration",
         ],
         "script_bash": "#!/bin/bash\n# Disable TLS 1.0/1.1 in nginx\n# ssl_protocols TLSv1.2 TLSv1.3;",
         "script_powershell": "# Disable old TLS versions\nNew-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\SecurityProviders\\SCHANNEL\\Protocols\\TLS 1.0\\Server' -Name 'Enabled' -Value 0 -PropertyType DWORD",
@@ -294,7 +308,7 @@ RECOMMENDATION_TEMPLATES = {
             "Remove unnecessary access rights",
             "Implement regular access reviews",
             "Document access control policies",
-            "Enable access logging"
+            "Enable access logging",
         ],
         "script_bash": "#!/bin/bash\n# Remove world-readable permissions\nfind /etc -type f -perm -o+r -exec chmod o-r {} \\;",
         "script_powershell": "# Audit local admin group\nGet-LocalGroupMember -Group 'Administrators'",
@@ -309,10 +323,10 @@ RECOMMENDATION_TEMPLATES = {
             "Implement log rotation and retention",
             "Configure alerting for critical events",
             "Test log collection and parsing",
-            "Document logging architecture"
+            "Document logging architecture",
         ],
         "script_bash": "#!/bin/bash\n# Enable auditd logging\nsudo systemctl enable auditd\nsudo systemctl start auditd",
-        "script_powershell": "# Enable Windows Security Auditing\nauditpol /set /subcategory:\"Logon\" /success:enable /failure:enable",
+        "script_powershell": '# Enable Windows Security Auditing\nauditpol /set /subcategory:"Logon" /success:enable /failure:enable',
     },
     "network": {
         "title": "Secure Network Configuration",
@@ -324,7 +338,7 @@ RECOMMENDATION_TEMPLATES = {
             "Implement network segmentation",
             "Enable network monitoring",
             "Test connectivity after changes",
-            "Document firewall rules"
+            "Document firewall rules",
         ],
         "script_bash": "#!/bin/bash\n# Configure UFW firewall\nsudo ufw default deny incoming\nsudo ufw default allow outgoing\nsudo ufw enable",
         "script_powershell": "# Enable Windows Firewall\nSet-NetFirewallProfile -Profile Domain,Public,Private -Enabled True",
@@ -339,7 +353,7 @@ RECOMMENDATION_TEMPLATES = {
             "Implement fix in test environment",
             "Validate the fix",
             "Deploy to production",
-            "Document changes"
+            "Document changes",
         ],
         "script_bash": "#!/bin/bash\n# Custom remediation script\necho 'Implement specific fix here'",
         "script_powershell": "# Custom remediation script\nWrite-Host 'Implement specific fix here'",
@@ -350,6 +364,7 @@ RECOMMENDATION_TEMPLATES = {
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
 
 def random_ip(prefix: str = None) -> str:
     """Generate a random IP address."""
@@ -369,10 +384,10 @@ def calculate_risk_score(findings: list) -> int:
     """Calculate risk score based on findings."""
     if not findings:
         return random.randint(0, 15)  # Low risk for no findings
-    
+
     severity_weights = {"critical": 25, "high": 15, "medium": 8, "low": 3}
     total_weight = sum(severity_weights.get(f.severity, 0) for f in findings)
-    
+
     # Normalize to 0-100 scale with some randomness
     score = min(100, total_weight + random.randint(-5, 10))
     return max(0, score)
@@ -401,14 +416,14 @@ def generate_score_breakdown(findings: list) -> dict:
         "encryption": {"score": random.randint(60, 100), "weight": 10},
         "logging": {"score": random.randint(50, 100), "weight": 5},
     }
-    
+
     # Adjust scores based on findings
     for finding in findings:
         category = finding.category
         if category in breakdown:
             penalty = {"critical": 30, "high": 20, "medium": 10, "low": 5}.get(finding.severity, 5)
             breakdown[category]["score"] = max(0, breakdown[category]["score"] - penalty)
-    
+
     return breakdown
 
 
@@ -446,10 +461,11 @@ def generate_scan_payload(system: System) -> dict:
 # Data Generation Functions
 # =============================================================================
 
+
 def create_test_users() -> list:
     """Create test users with different roles."""
     users = []
-    
+
     # Admin user (main test account)
     admin, created = User.objects.get_or_create(
         email="test@test.com",
@@ -460,7 +476,7 @@ def create_test_users() -> list:
             "is_active": True,
             "is_staff": True,
             "is_superuser": True,
-        }
+        },
     )
     if created:
         admin.set_password("test123")
@@ -469,7 +485,7 @@ def create_test_users() -> list:
     else:
         print(f"• Admin user exists: {admin.email}")
     users.append(admin)
-    
+
     # Additional users
     test_users = [
         ("auditor@securesys.local", "Sarah", "Chen", "auditor"),
@@ -477,7 +493,7 @@ def create_test_users() -> list:
         ("viewer@securesys.local", "Maria", "Garcia", "viewer"),
         ("operations@securesys.local", "Alex", "Johnson", "viewer"),
     ]
-    
+
     for email, first_name, last_name, role in test_users:
         user, created = User.objects.get_or_create(
             email=email,
@@ -486,36 +502,32 @@ def create_test_users() -> list:
                 "last_name": last_name,
                 "role": role,
                 "is_active": True,
-            }
+            },
         )
         if created:
             user.set_password("SecureSys2024!")
             user.save()
             print(f"✓ Created {role} user: {email}")
         users.append(user)
-    
+
     return users
 
 
 def create_systems(num_systems: int = 15) -> list:
     """Create diverse system records."""
     systems = []
-    
+
     print(f"\n📦 Creating {num_systems} systems...")
-    
+
     for i in range(num_systems):
         hostname_template = random.choice(HOSTNAMES)
         hostname = hostname_template.format(str(i + 1).zfill(2))
-        
+
         os_name, os_versions = random.choice(OPERATING_SYSTEMS)
         os_version = random.choice(os_versions)
-        
-        environment = random.choices(
-            ENVIRONMENTS,
-            weights=[15, 20, 45, 20],  # More production systems
-            k=1
-        )[0]
-        
+
+        environment = random.choices(ENVIRONMENTS, weights=[15, 20, 45, 20], k=1)[0]  # More production systems
+
         # Use consistent IP prefix for environment
         ip_prefix = {
             "production": "10.0.1.",
@@ -523,7 +535,7 @@ def create_systems(num_systems: int = 15) -> list:
             "development": "192.168.1.",
             "testing": "192.168.10.",
         }.get(environment, random.choice(IP_PREFIXES))
-        
+
         system, created = System.objects.get_or_create(
             hostname=hostname,
             defaults={
@@ -534,16 +546,16 @@ def create_systems(num_systems: int = 15) -> list:
                 "description": f"Auto-generated {environment} {os_name} system for testing",
                 "is_active": True,
                 "last_seen": random_date_in_range(7),
-            }
+            },
         )
-        
+
         if created:
             print(f"  ✓ {hostname} ({os_name} {os_version}) - {environment}")
         else:
             print(f"  • {hostname} already exists")
-        
+
         systems.append(system)
-    
+
     return systems
 
 
@@ -552,24 +564,20 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
     all_scans = []
     all_findings = []
     all_recommendations = []
-    
+
     print(f"\n🔍 Creating scans for {len(systems)} systems...")
-    
+
     for system in systems:
         num_scans = random.randint(1, scans_per_system)
-        
+
         for scan_num in range(num_scans):
             # Determine scan type and characteristics
             scan_type = random.choice(SCAN_TYPES)
             scan_date = random_date_in_range(30)
-            
+
             # 85% completed, 10% processing, 5% failed
-            status_choice = random.choices(
-                ["completed", "processing", "failed"],
-                weights=[85, 10, 5],
-                k=1
-            )[0]
-            
+            status_choice = random.choices(["completed", "processing", "failed"], weights=[85, 10, 5], k=1)[0]
+
             scan = Scan.objects.create(
                 system=system,
                 scan_type=scan_type,
@@ -577,7 +585,7 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
                 scan_payload=generate_scan_payload(system) if status_choice == "completed" else {},
                 started_at=scan_date,
             )
-            
+
             # Only create findings for completed scans
             if status_choice == "completed":
                 # Generate findings based on environment (production = more scrutiny)
@@ -587,9 +595,9 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
                     "development": random.randint(1, 6),
                     "testing": random.randint(0, 4),
                 }.get(system.environment, random.randint(1, 5))
-                
+
                 scan_findings = []
-                
+
                 # Distribute findings across severities
                 for severity in ["critical", "high", "medium", "low"]:
                     severity_weights = {
@@ -598,19 +606,19 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
                         "medium": 0.35,
                         "low": 0.45,
                     }
-                    
+
                     num_of_severity = int(num_findings_base * severity_weights[severity])
                     if severity in ["critical", "high"] and random.random() > 0.7:
                         num_of_severity += 1  # Sometimes add extra critical/high
-                    
+
                     templates = FINDING_TEMPLATES[severity]
                     for _ in range(num_of_severity):
                         template = random.choice(templates)
-                        
+
                         # Determine if finding is resolved (older findings more likely resolved)
                         days_old = (timezone.now() - scan_date).days
                         is_resolved = random.random() < (days_old / 60)  # More likely resolved if older
-                        
+
                         finding = Finding.objects.create(
                             scan=scan,
                             category=template["category"],
@@ -620,23 +628,24 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
                             cwe_id=template.get("cwe_id", ""),
                             cvss_score=template.get("cvss_score"),
                             evidence={
-                                "affected_paths": [f"/etc/{random.choice(['apache2', 'nginx', 'ssh', 'mysql'])}/config"],
+                                "affected_paths": [
+                                    f"/etc/{random.choice(['apache2', 'nginx', 'ssh', 'mysql'])}/config"
+                                ],
                                 "detection_method": random.choice(["signature", "heuristic", "policy"]),
                                 "first_detected": scan_date.isoformat(),
                             },
                             is_resolved=is_resolved,
                             resolved_at=timezone.now() if is_resolved else None,
                         )
-                        
+
                         scan_findings.append(finding)
                         all_findings.append(finding)
-                        
+
                         # Create recommendation for each finding
                         rec_template = RECOMMENDATION_TEMPLATES.get(
-                            template["category"],
-                            RECOMMENDATION_TEMPLATES["other"]
+                            template["category"], RECOMMENDATION_TEMPLATES["other"]
                         )
-                        
+
                         recommendation = Recommendation.objects.create(
                             finding=finding,
                             priority=severity,
@@ -650,69 +659,71 @@ def create_scans_and_findings(systems: list, scans_per_system: int = 3) -> tuple
                                 f"https://nvd.nist.gov/vuln/detail/{template.get('cwe_id', 'CWE-000')}",
                                 "https://cwe.mitre.org/data/definitions/",
                                 "https://owasp.org/www-project-top-ten/",
-                            ]
+                            ],
                         )
                         all_recommendations.append(recommendation)
-                
+
                 # Update scan with calculated scores
                 risk_score = calculate_risk_score(scan_findings)
                 maturity_level = determine_maturity_level(risk_score)
                 score_breakdown = generate_score_breakdown(scan_findings)
-                
+
                 scan.risk_score = risk_score
                 scan.maturity_level = maturity_level
                 scan.score_breakdown = score_breakdown
                 scan.completed_at = scan_date + timedelta(minutes=random.randint(2, 30))
                 scan.save()
-                
+
                 # Update system's latest scan data
                 if not system.latest_risk_score or scan_date > (system.last_seen or timezone.now()):
                     system.latest_risk_score = risk_score
                     system.latest_maturity_level = maturity_level
                     system.last_seen = scan_date
                     system.save()
-                
+
             elif status_choice == "failed":
-                scan.error_message = random.choice([
-                    "Connection timeout - unable to reach agent",
-                    "Agent authentication failed",
-                    "Insufficient permissions to complete scan",
-                    "Scan interrupted by system restart",
-                    "Memory limit exceeded during analysis",
-                ])
+                scan.error_message = random.choice(
+                    [
+                        "Connection timeout - unable to reach agent",
+                        "Agent authentication failed",
+                        "Insufficient permissions to complete scan",
+                        "Scan interrupted by system restart",
+                        "Memory limit exceeded during analysis",
+                    ]
+                )
                 scan.completed_at = scan_date + timedelta(minutes=random.randint(1, 5))
                 scan.save()
-            
+
             all_scans.append(scan)
-    
+
     return all_scans, all_findings, all_recommendations
 
 
 def print_summary(users: list, systems: list, scans: list, findings: list, recommendations: list):
     """Print a summary of generated data."""
-    
+
     print("\n" + "=" * 60)
     print("📊 SYNTHETIC DATA GENERATION COMPLETE")
     print("=" * 60)
-    
+
     print(f"\n👥 Users: {len(users)}")
     for user in users:
         print(f"   • {user.email} ({user.role})")
-    
+
     print(f"\n🖥️  Systems: {len(systems)}")
     env_counts = {}
     for system in systems:
         env_counts[system.environment] = env_counts.get(system.environment, 0) + 1
     for env, count in sorted(env_counts.items()):
         print(f"   • {env.capitalize()}: {count}")
-    
+
     print(f"\n🔍 Scans: {len(scans)}")
     status_counts = {}
     for scan in scans:
         status_counts[scan.status] = status_counts.get(scan.status, 0) + 1
     for status, count in sorted(status_counts.items()):
         print(f"   • {status.capitalize()}: {count}")
-    
+
     print(f"\n⚠️  Findings: {len(findings)}")
     severity_counts = {}
     resolved_count = 0
@@ -720,16 +731,16 @@ def print_summary(users: list, systems: list, scans: list, findings: list, recom
         severity_counts[finding.severity] = severity_counts.get(finding.severity, 0) + 1
         if finding.is_resolved:
             resolved_count += 1
-    
+
     severity_order = ["critical", "high", "medium", "low"]
     for severity in severity_order:
         count = severity_counts.get(severity, 0)
         indicator = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(severity, "⚪")
         print(f"   {indicator} {severity.capitalize()}: {count}")
     print(f"   ✓ Resolved: {resolved_count} ({resolved_count/len(findings)*100:.1f}%)" if findings else "")
-    
+
     print(f"\n💡 Recommendations: {len(recommendations)}")
-    
+
     print("\n" + "=" * 60)
     print("🚀 Ready to explore! Login credentials:")
     print("=" * 60)
@@ -743,46 +754,46 @@ def print_summary(users: list, systems: list, scans: list, findings: list, recom
 # Main Entry Point
 # =============================================================================
 
+
 def main(num_systems: int = 15, scans_per_system: int = 3):
     """Main function to generate all synthetic data."""
-    
+
     print("\n" + "=" * 60)
     print("🔐 SecureSys Auditor - Synthetic Data Generator")
     print("=" * 60)
-    
+
     try:
         # Create test users
         print("\n👥 Creating test users...")
         users = create_test_users()
-        
+
         # Create systems
         systems = create_systems(num_systems)
-        
+
         # Create scans, findings, and recommendations
-        scans, findings, recommendations = create_scans_and_findings(
-            systems, scans_per_system
-        )
-        
+        scans, findings, recommendations = create_scans_and_findings(systems, scans_per_system)
+
         # Print summary
         print_summary(users, systems, scans, findings, recommendations)
-        
+
         return True
-        
+
     except Exception as e:
         print(f"\n❌ Error generating data: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Generate synthetic data for SecureSys Auditor")
     parser.add_argument("--num-systems", type=int, default=15, help="Number of systems to create")
     parser.add_argument("--scans-per-system", type=int, default=3, help="Max scans per system")
-    
+
     args = parser.parse_args()
-    
+
     success = main(num_systems=args.num_systems, scans_per_system=args.scans_per_system)
     sys.exit(0 if success else 1)

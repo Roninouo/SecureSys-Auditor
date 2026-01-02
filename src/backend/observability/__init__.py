@@ -7,4 +7,4 @@ Provides centralized observability with:
 - Custom metrics
 - Health checks
 """
-default_app_config = 'observability.apps.ObservabilityConfig'
+default_app_config = "observability.apps.ObservabilityConfig"

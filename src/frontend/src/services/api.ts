@@ -54,21 +54,21 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      
+
       const refreshToken = useAuthStore.getState().refreshToken
-      
+
       if (refreshToken) {
         try {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
             refresh: refreshToken,
           })
-          
+
           const { access, refresh } = response.data
           useAuthStore.getState().setTokens(access, refresh)
-          
+
           originalRequest.headers.Authorization = `Bearer ${access}`
           return api(originalRequest)
         } catch (refreshError) {
@@ -80,7 +80,7 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
@@ -90,21 +90,21 @@ scanningApi.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      
+
       const refreshToken = useAuthStore.getState().refreshToken
-      
+
       if (refreshToken) {
         try {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
             refresh: refreshToken,
           })
-          
+
           const { access, refresh } = response.data
           useAuthStore.getState().setTokens(access, refresh)
-          
+
           originalRequest.headers.Authorization = `Bearer ${access}`
           return scanningApi(originalRequest)
         } catch (refreshError) {
@@ -116,7 +116,7 @@ scanningApi.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
@@ -127,7 +127,7 @@ export const authApi = {
     const response = await api.post('/auth/login/', { email, password })
     return response.data
   },
-  
+
   refreshToken: async (refreshToken: string) => {
     const response = await api.post('/auth/refresh/', { refresh: refreshToken })
     return response.data
@@ -176,22 +176,44 @@ export const systemsApi = {
     const response = await scanningApi.get('/systems/')
     return response.data.results || response.data
   },
-  
+
   getById: async (id: string) => {
     const response = await scanningApi.get(`/systems/${id}/`)
     return response.data
   },
-  
-  create: async (data: { hostname: string; os: string; environment: string }) => {
+
+  create: async (data: {
+    hostname: string
+    os: string
+    environment: string
+    description?: string
+    ip_address?: string
+  }) => {
     const response = await scanningApi.post('/systems/', data)
     return response.data
   },
-  
+
+  update: async (id: string, data: Partial<{
+    hostname: string
+    os: string
+    environment: string
+    description?: string
+    ip_address?: string
+  }>) => {
+    const response = await scanningApi.patch(`/systems/${id}/`, data)
+    return response.data
+  },
+
+  delete: async (id: string) => {
+    const response = await scanningApi.delete(`/systems/${id}/`)
+    return response.data
+  },
+
   getScans: async (systemId: string) => {
     const response = await scanningApi.get(`/systems/${systemId}/scans/`)
     return response.data
   },
-  
+
   getByHostname: async (hostname: string) => {
     const response = await scanningApi.get(`/systems/by_hostname/`, {
       params: { hostname }
@@ -206,29 +228,29 @@ export const scansApi = {
     const response = await scanningApi.get('/scans/')
     return response.data.results || response.data
   },
-  
+
   getById: async (id: string) => {
     const response = await scanningApi.get(`/scans/${id}/`)
     return response.data
   },
-  
+
   submit: async (data: { system_id: string; scan_payload: object; scan_type?: string }) => {
     const response = await scanningApi.post('/scans/submit/', data)
     return response.data
   },
-  
+
   getFindings: async (scanId: string, filters?: { severity?: string; category?: string }) => {
     const response = await scanningApi.get(`/scans/${scanId}/findings/`, {
       params: filters
     })
     return response.data
   },
-  
+
   getSummary: async (scanId: string) => {
     const response = await scanningApi.get(`/scans/${scanId}/summary/`)
     return response.data
   },
-  
+
   // URL/Website scanning
   scanUrl: async (data: { url: string; environment?: string; description?: string }) => {
     const response = await scanningApi.post('/scans/url/', data)
@@ -242,22 +264,22 @@ export const findingsApi = {
     const response = await scanningApi.get('/findings/', { params: filters })
     return response.data.results || response.data
   },
-  
+
   getById: async (id: string) => {
     const response = await scanningApi.get(`/findings/${id}/`)
     return response.data
   },
-  
+
   resolve: async (id: string) => {
     const response = await scanningApi.post(`/findings/${id}/resolve/`)
     return response.data
   },
-  
+
   unresolve: async (id: string) => {
     const response = await scanningApi.post(`/findings/${id}/unresolve/`)
     return response.data
   },
-  
+
   getRecommendations: async (findingId: string) => {
     const response = await scanningApi.get(`/findings/${findingId}/recommendations/`)
     return response.data

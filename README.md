@@ -140,6 +140,69 @@ python run.py scan --api-url http://localhost:8000 --api-key YOUR_KEY
 python run.py test
 ```
 
+### Observability (Local) 🔭
+
+Quick notes to run and debug OpenTelemetry traces & metrics locally using the project's collector and Prometheus.
+
+- Config files:
+  - `observability/otel-collector-config.yaml`
+  - `observability/prometheus.yml`
+
+- Start the local observability stack (collector + Prometheus + Jaeger):
+
+```bash
+# Start the collector, Prometheus, and Jaeger
+docker compose up -d otel-collector prometheus jaeger
+```
+
+- Important: the collector's OTLP ports are kept internal to the Compose network by default (no host `4317`/`4318` mappings) to avoid port collisions. Prometheus scrapes the collector at `otel-collector:8889` and Jaeger UI is available at `http://localhost:16686`.
+
+- Generate a quick test trace and verify it in Jaeger (bash):
+
+```bash
+# Send a few requests that create spans
+for i in $(seq 1 5); do curl -fsS http://localhost:8000/api/v1/health/ >/dev/null || true; sleep 1; done
+# Wait for tail-based sampling decision (default ~30s)
+sleep 35
+# Query Jaeger for recent traces from the backend
+curl -s 'http://localhost:16686/api/traces?service=securesys-backend&limit=5' | jq .
+```
+
+- If traces do not appear:
+  - Temporarily increase sampling for local testing by setting `OTEL_SAMPLING_RATE=1.0` under the `backend` service in `docker-compose.yml`, then recreate the backend:
+
+```bash
+# After editing docker-compose.yml
+docker compose up -d --force-recreate backend
+```
+
+  - Or relax/remove `tail_sampling` from `observability/otel-collector-config.yaml` while debugging.
+
+- Check Prometheus targets: open `http://localhost:9090/targets` and confirm the `otel-collector` job is `UP` (target `otel-collector:8889`).
+
+- Grafana (Dashboards)
+  - Start Grafana locally:
+
+```bash
+# Start grafana service (local compose)
+docker compose up -d grafana
+```
+
+  - Open Grafana UI at `http://localhost:3002` (local compose uses host port **3002** to avoid collision with frontend on 3000). Default admin user/password: `admin`/`admin` (change with `GRAFANA_ADMIN_PASSWORD` or `GF_SECURITY_ADMIN_PASSWORD` in `.env`).
+  - Provisioned datasources: **Prometheus**, **Jaeger**. Imported dashboards: `application-overview.json` (Application Overview) and `slo-dashboard.json` (SLOs & Error Budget) are available under Dashboards → SecureSys Dashboards.
+  - If port 3002 conflicts on your host, change the `GRAFANA_PORT` environment variable in `.env` or adjust the `ports` mapping in `docker-compose.yml`.
+
+
+- Collector health & metrics (no port mapping required):
+
+```bash
+# Run these from the host using docker exec
+docker compose exec otel-collector curl -fsS http://localhost:13133/health
+docker compose exec otel-collector curl -fsS http://localhost:8889/metrics | head
+```
+
+- If you need host-level access to OTLP for local tools, temporarily add host port mappings in `docker-compose.yml` (e.g., `"4317:4317"`) for `otel-collector` and restart it — remember to revert this change when finished.
+
 ### Using Docker (Recommended)
 
 ```bash

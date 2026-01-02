@@ -26,13 +26,13 @@ spec:
     spec:
       serviceAccountName: securesys-backend
       terminationGracePeriodSeconds: 120  # Allow time for task completion
-      
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
-      
+
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -42,20 +42,20 @@ spec:
                   matchLabels:
                     app: securesys-worker
                 topologyKey: kubernetes.io/hostname
-      
+
       containers:
         # Main worker for scans queue
         - name: worker-scans
           image: securesys/backend:latest
           imagePullPolicy: Always
           command: ["celery", "-A", "backend", "worker", "-l", "info", "-Q", "scans", "--concurrency=2"]
-          
+
           envFrom:
             - configMapRef:
                 name: securesys-config
             - secretRef:
                 name: securesys-secrets
-          
+
           resources:
             requests:
               cpu: 250m
@@ -63,18 +63,18 @@ spec:
             limits:
               cpu: 1000m
               memory: 1Gi
-          
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
-          
+
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-          
+
           livenessProbe:
             exec:
               command:
@@ -89,25 +89,25 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
-          
+
           lifecycle:
             preStop:
               exec:
                 # Graceful shutdown: stop accepting new tasks
                 command: ["/bin/sh", "-c", "celery -A backend control cancel_consumer scans && sleep 30"]
-        
+
         # Worker for reports queue
         - name: worker-reports
           image: securesys/backend:latest
           imagePullPolicy: Always
           command: ["celery", "-A", "backend", "worker", "-l", "info", "-Q", "reports", "--concurrency=1"]
-          
+
           envFrom:
             - configMapRef:
                 name: securesys-config
             - secretRef:
                 name: securesys-secrets
-          
+
           resources:
             requests:
               cpu: 250m
@@ -115,37 +115,37 @@ spec:
             limits:
               cpu: 1000m
               memory: 2Gi
-          
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
-          
+
           volumeMounts:
             - name: tmp
               mountPath: /tmp
             - name: reports
               mountPath: /app/media/reports
-          
+
           lifecycle:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "celery -A backend control cancel_consumer reports && sleep 60"]
-        
+
         # Worker for webhooks queue
         - name: worker-webhooks
           image: securesys/backend:latest
           imagePullPolicy: Always
           command: ["celery", "-A", "backend", "worker", "-l", "info", "-Q", "webhooks", "--concurrency=4"]
-          
+
           envFrom:
             - configMapRef:
                 name: securesys-config
             - secretRef:
                 name: securesys-secrets
-          
+
           resources:
             requests:
               cpu: 100m
@@ -153,23 +153,23 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
-          
+
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
-          
+
           volumeMounts:
             - name: tmp
               mountPath: /tmp
-          
+
           lifecycle:
             preStop:
               exec:
                 command: ["/bin/sh", "-c", "celery -A backend control cancel_consumer webhooks && sleep 15"]
-      
+
       volumes:
         - name: tmp
           emptyDir: {}

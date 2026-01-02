@@ -39,7 +39,7 @@ export function ExportButton<T extends Record<string, unknown>>({
     try {
       // Generate CSV content
       const headerRow = headers.map((h) => escapeCSVField(h.label)).join(',')
-      
+
       const dataRows = data.map((item) =>
         headers
           .map((h) => {

@@ -1,11 +1,11 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { 
-  LayoutDashboard, 
+import {
+  LayoutDashboard,
   Server,
-  Scan, 
-  FileText, 
-  Settings, 
+  Scan,
+  FileText,
+  Settings,
   LogOut,
   Shield,
   User

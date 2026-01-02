@@ -8,4 +8,4 @@ Handles scan processing with:
 - Proper Celery task design (IDs, not ORM objects)
 - Dedicated queue for scan processing
 """
-default_app_config = 'scanning.apps.ScanningConfig'
+default_app_config = "scanning.apps.ScanningConfig"

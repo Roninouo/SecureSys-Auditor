@@ -16,10 +16,10 @@ log() {
 check_endpoint() {
     local url="$1"
     local expected_code="${2:-200}"
-    
+
     log "Checking $url..."
     local code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
-    
+
     if [ "$code" -eq "$expected_code" ]; then
         echo -e "${GREEN}PASS${NC}: $url returned $code"
         return 0

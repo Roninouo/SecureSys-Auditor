@@ -5,9 +5,10 @@ A simple, easy-to-use Python client for the SecureSys Auditor API.
 
 Usage:
     from securesys_client import SecureSysClient
-    
-    client = SecureSysClient(api_url="https://api.securesys.io", api_key="your-key")
-    
+
+    # Prefer environment variables / secret managers over hard-coded credentials
+    client = SecureSysClient("https://api.securesys.io", "<token>")
+
     # Submit a scan
     scan = client.submit_scan(
         hostname="webserver-01.example.com",
@@ -16,17 +17,15 @@ Usage:
             {"title": "CVE-2023-1234", "severity": "high", "description": "..."}
         ]
     )
-    
+
     # Get scan status
     status = client.get_scan(scan["id"])
-    
+
     # List all scans
     scans = client.list_scans(page=1, page_size=20)
 """
-
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urljoin
@@ -41,6 +40,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class Finding:
     """Represents a security finding."""
+
     title: str
     severity: str  # critical, high, medium, low, info
     description: str
@@ -48,7 +48,7 @@ class Finding:
     affected_component: str = ""
     cve_id: Optional[str] = None
     cwe_id: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "title": self.title,
@@ -64,6 +64,7 @@ class Finding:
 @dataclass
 class ScanResult:
     """Represents a scan result."""
+
     id: str
     hostname: str
     scan_type: str
@@ -74,7 +75,7 @@ class ScanResult:
     high_count: int = 0
     medium_count: int = 0
     low_count: int = 0
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ScanResult":
         return cls(
@@ -93,6 +94,7 @@ class ScanResult:
 
 class SecureSysError(Exception):
     """Base exception for SecureSys client errors."""
+
     def __init__(self, message: str, status_code: Optional[int] = None, response: Optional[Dict] = None):
         super().__init__(message)
         self.status_code = status_code
@@ -101,11 +103,13 @@ class SecureSysError(Exception):
 
 class AuthenticationError(SecureSysError):
     """Raised when authentication fails."""
+
     pass
 
 
 class RateLimitError(SecureSysError):
     """Raised when rate limit is exceeded."""
+
     def __init__(self, message: str, retry_after: Optional[int] = None, **kwargs):
         super().__init__(message, **kwargs)
         self.retry_after = retry_after
@@ -113,19 +117,20 @@ class RateLimitError(SecureSysError):
 
 class ValidationError(SecureSysError):
     """Raised when request validation fails."""
+
     pass
 
 
 class SecureSysClient:
     """
     SecureSys Auditor API Client.
-    
+
     Example:
         client = SecureSysClient(
-            api_url="https://api.securesys.io",
-            api_key="your-api-key"
+            "https://api.securesys.io",
+            "<token>",
         )
-        
+
         # Submit a scan
         scan = client.submit_scan(
             hostname="server.example.com",
@@ -133,10 +138,10 @@ class SecureSysClient:
             findings=[Finding(title="CVE-2023-1234", severity="high", description="...")]
         )
     """
-    
+
     DEFAULT_TIMEOUT = 30
     DEFAULT_RETRIES = 3
-    
+
     def __init__(
         self,
         api_url: str,
@@ -147,7 +152,7 @@ class SecureSysClient:
     ):
         """
         Initialize the SecureSys client.
-        
+
         Args:
             api_url: Base URL of the SecureSys API
             api_key: API key for authentication
@@ -159,7 +164,7 @@ class SecureSysClient:
         self.api_key = api_key
         self.timeout = timeout
         self.verify_ssl = verify_ssl
-        
+
         # Configure session with retries
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -171,14 +176,16 @@ class SecureSysClient:
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
-        
+
         # Set default headers
-        self.session.headers.update({
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "SecureSys-Python-Client/1.0",
-        })
-    
+        self.session.headers.update(
+            {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "SecureSys-Python-Client/1.0",
+            }
+        )
+
     def _request(
         self,
         method: str,
@@ -188,7 +195,7 @@ class SecureSysClient:
     ) -> Dict[str, Any]:
         """Make an API request."""
         url = urljoin(self.api_url + "/", endpoint.lstrip("/"))
-        
+
         try:
             response = self.session.request(
                 method=method,
@@ -198,53 +205,45 @@ class SecureSysClient:
                 timeout=self.timeout,
                 verify=self.verify_ssl,
             )
-            
+
             # Handle errors
             if response.status_code == 401:
-                raise AuthenticationError(
-                    "Authentication failed. Check your API key.",
-                    status_code=401
-                )
+                raise AuthenticationError("Authentication failed. Check your API key.", status_code=401)
             elif response.status_code == 429:
                 retry_after = response.headers.get("Retry-After")
                 raise RateLimitError(
-                    "Rate limit exceeded.",
-                    status_code=429,
-                    retry_after=int(retry_after) if retry_after else None
+                    "Rate limit exceeded.", status_code=429, retry_after=int(retry_after) if retry_after else None
                 )
             elif response.status_code == 400:
                 raise ValidationError(
                     f"Validation error: {response.text}",
                     status_code=400,
-                    response=response.json() if response.text else None
+                    response=response.json() if response.text else None,
                 )
             elif response.status_code >= 400:
-                raise SecureSysError(
-                    f"API error: {response.text}",
-                    status_code=response.status_code
-                )
-            
+                raise SecureSysError(f"API error: {response.text}", status_code=response.status_code)
+
             if response.text:
                 return response.json()
             return {}
-            
+
         except requests.exceptions.Timeout:
             raise SecureSysError("Request timed out")
         except requests.exceptions.ConnectionError:
             raise SecureSysError("Connection failed")
-    
+
     # =========================================================================
     # Health & Status
     # =========================================================================
-    
+
     def health_check(self) -> Dict[str, Any]:
         """Check API health status."""
         return self._request("GET", "/api/v1/health/")
-    
+
     # =========================================================================
     # Scans
     # =========================================================================
-    
+
     def submit_scan(
         self,
         hostname: str,
@@ -255,14 +254,14 @@ class SecureSysClient:
     ) -> ScanResult:
         """
         Submit a new security scan.
-        
+
         Args:
             hostname: Target hostname
             scan_type: Type of scan (vulnerability, compliance, configuration)
             findings: List of findings (Finding objects or dicts)
             agent_version: Version of the scanning agent
             metadata: Additional metadata
-        
+
         Returns:
             ScanResult object with scan details
         """
@@ -274,7 +273,7 @@ class SecureSysClient:
                     findings_data.append(f.to_dict())
                 else:
                     findings_data.append(f)
-        
+
         data = {
             "hostname": hostname,
             "scan_type": scan_type,
@@ -284,15 +283,15 @@ class SecureSysClient:
             "findings": findings_data,
             "metadata": metadata or {},
         }
-        
+
         result = self._request("POST", "/api/v1/scans/", data=data)
         return ScanResult.from_dict(result)
-    
+
     def get_scan(self, scan_id: str) -> ScanResult:
         """Get details of a specific scan."""
         result = self._request("GET", f"/api/v1/scans/{scan_id}/")
         return ScanResult.from_dict(result)
-    
+
     def list_scans(
         self,
         page: int = 1,
@@ -302,13 +301,13 @@ class SecureSysClient:
     ) -> Dict[str, Any]:
         """
         List scans with pagination and filtering.
-        
+
         Args:
             page: Page number
             page_size: Number of results per page
             hostname: Filter by hostname
             status: Filter by status
-        
+
         Returns:
             Dict with 'results' list and pagination info
         """
@@ -317,47 +316,47 @@ class SecureSysClient:
             params["hostname"] = hostname
         if status:
             params["status"] = status
-        
+
         return self._request("GET", "/api/v1/scans/", params=params)
-    
+
     def get_scan_findings(self, scan_id: str) -> List[Dict[str, Any]]:
         """Get findings for a specific scan."""
         result = self._request("GET", f"/api/v1/scans/{scan_id}/findings/")
         return result.get("results", [])
-    
+
     # =========================================================================
     # Systems
     # =========================================================================
-    
+
     def list_systems(self, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
         """List all systems."""
         return self._request("GET", "/api/v1/systems/", params={"page": page, "page_size": page_size})
-    
+
     def get_system(self, system_id: str) -> Dict[str, Any]:
         """Get details of a specific system."""
         return self._request("GET", f"/api/v1/systems/{system_id}/")
-    
+
     # =========================================================================
     # Dashboard
     # =========================================================================
-    
+
     def get_dashboard_stats(self) -> Dict[str, Any]:
         """Get dashboard statistics."""
         return self._request("GET", "/api/v1/dashboard/stats/")
-    
+
     def get_severity_breakdown(self) -> Dict[str, Any]:
         """Get severity breakdown for findings."""
         return self._request("GET", "/api/v1/dashboard/severity-breakdown/")
-    
+
     # =========================================================================
     # Webhooks
     # =========================================================================
-    
+
     def list_webhooks(self) -> List[Dict[str, Any]]:
         """List configured webhooks."""
         result = self._request("GET", "/api/v1/webhooks/")
         return result.get("results", [])
-    
+
     def create_webhook(
         self,
         name: str,
@@ -367,7 +366,7 @@ class SecureSysClient:
     ) -> Dict[str, Any]:
         """
         Create a new webhook endpoint.
-        
+
         Args:
             name: Webhook name
             url: Webhook URL
@@ -381,7 +380,7 @@ class SecureSysClient:
         }
         if secret:
             data["secret"] = secret
-        
+
         return self._request("POST", "/api/v1/webhooks/", data=data)
 
 
@@ -394,15 +393,15 @@ def create_client(api_url: str, api_key: str, **kwargs) -> SecureSysClient:
 if __name__ == "__main__":
     # Example usage
     import os
-    
+
     client = SecureSysClient(
         api_url=os.environ.get("SECURESYS_API_URL", "http://localhost:8000"),
         api_key=os.environ.get("SECURESYS_API_KEY", "test-key"),
     )
-    
+
     # Check health
     print("Health:", client.health_check())
-    
+
     # Submit a scan
     scan = client.submit_scan(
         hostname="example-server.local",

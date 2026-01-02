@@ -104,31 +104,31 @@ def validate_signature(request):
     # Extract headers
     signature = request.headers.get('X-Signature')
     timestamp = request.headers.get('X-Timestamp')
-    
+
     if not signature or not timestamp:
         return False, 'Missing signature headers'
-    
+
     # Check timestamp freshness (5-minute window)
     request_time = int(timestamp)
     current_time = int(time.time())
     if abs(current_time - request_time) > 300:
         return False, 'Request timestamp expired'
-    
+
     # Reconstruct signature
     payload = request.json
     canonical = json.dumps(payload, sort_keys=True, separators=(',', ':'))
     message = f"{timestamp}.{canonical}"
-    
+
     expected = hmac.new(
         key=api_key.encode('utf-8'),
         msg=message.encode('utf-8'),
         digestmod=hashlib.sha256
     ).hexdigest()
-    
+
     # Constant-time comparison
     if not hmac.compare_digest(signature, expected):
         return False, 'Invalid signature'
-    
+
     return True, None
 ```
 

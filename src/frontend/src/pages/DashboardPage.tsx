@@ -1,24 +1,31 @@
 import { useQuery } from '@tanstack/react-query'
-import { 
-  Shield, 
-  Server, 
-  AlertTriangle, 
+import { useNavigate } from 'react-router-dom'
+import {
+  Shield,
+  Server,
+  AlertTriangle,
   CheckCircle,
   TrendingUp,
-  Activity
+  Activity,
+  FileText,
+  Plus,
+  Play,
+  RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { dashboardApi } from '@/services/api'
+import { Button } from '@/components/ui/Button'
+import { dashboardApi, findingsApi } from '@/services/api'
 import { cn, getRiskScoreColor } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 import type { DashboardStats } from '@/types'
 
-function StatCard({ 
-  title, 
-  value, 
-  icon: Icon, 
+function StatCard({
+  title,
+  value,
+  icon: Icon,
   description
-}: { 
+}: {
   title: string
   value: string | number
   icon: React.ElementType
@@ -47,7 +54,7 @@ function SeverityCard({ severity, count }: { severity: string; count: number }) 
     medium: 'bg-yellow-500',
     low: 'bg-green-500',
   }
-  
+
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
       <div className="flex items-center gap-3">
@@ -60,10 +67,48 @@ function SeverityCard({ severity, count }: { severity: string; count: number }) 
 }
 
 export default function DashboardPage() {
-  const { data: stats, isLoading, error } = useQuery<DashboardStats>({
+  const navigate = useNavigate()
+  const { addToast } = useToast()
+
+  const { data: stats, isLoading, error, refetch } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: dashboardApi.getStats,
   })
+
+  const handleViewCriticalFindings = () => {
+    navigate('/scans?severity=critical,high')
+    addToast({
+      type: 'info',
+      title: 'Filtro aplicado',
+      message: 'Mostrando hallazgos críticos y de alta severidad'
+    })
+  }
+
+  const handleGenerateReport = () => {
+    navigate('/reports')
+  }
+
+  const handleAddNewSystem = () => {
+    navigate('/systems?action=add')
+  }
+
+  const handleRunNewScan = () => {
+    navigate('/systems')
+    addToast({
+      type: 'info',
+      title: 'Selecciona un sistema',
+      message: 'Elige un sistema para iniciar un nuevo escaneo'
+    })
+  }
+
+  const handleRefreshData = async () => {
+    await refetch()
+    addToast({
+      type: 'success',
+      title: 'Datos actualizados',
+      message: 'El dashboard se ha actualizado correctamente'
+    })
+  }
 
   if (isLoading) {
     return (
@@ -86,11 +131,17 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Security Dashboard</h1>
-        <p className="text-muted-foreground">
-          Overview of your organization's security posture
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Security Dashboard</h1>
+          <p className="text-muted-foreground">
+            Overview of your organization's security posture
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleRefreshData}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Grid */}
@@ -194,18 +245,42 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewCriticalFindings}
+              className="gap-2"
+            >
+              <AlertTriangle className="h-4 w-4 text-red-500" />
               View Critical Findings
-            </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateReport}
+              className="gap-2"
+            >
+              <FileText className="h-4 w-4 text-blue-500" />
               Generate Report
-            </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAddNewSystem}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4 text-green-500" />
               Add New System
-            </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunNewScan}
+              className="gap-2"
+            >
+              <Play className="h-4 w-4 text-primary" />
               Run New Scan
-            </Badge>
+            </Button>
           </div>
         </CardContent>
       </Card>

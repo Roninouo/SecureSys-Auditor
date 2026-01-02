@@ -1,17 +1,17 @@
 /**
  * SecureSys Auditor TypeScript Client
- * 
+ *
  * A type-safe client for the SecureSys Auditor API.
- * 
+ *
  * @example
  * ```typescript
  * import { SecureSysClient, Finding } from './securesys-client';
- * 
+ *
  * const client = new SecureSysClient({
  *   apiUrl: 'https://api.securesys.io',
  *   apiKey: 'your-api-key'
  * });
- * 
+ *
  * const scan = await client.submitScan({
  *   hostname: 'webserver-01.example.com',
  *   scanType: 'vulnerability',
@@ -163,7 +163,7 @@ export class SecureSysClient {
     } = {}
   ): Promise<T> {
     const url = new URL(`${this.apiUrl}${endpoint}`);
-    
+
     if (options.params) {
       Object.entries(options.params).forEach(([key, value]) => {
         url.searchParams.append(key, String(value));
@@ -221,7 +221,7 @@ export class SecureSysClient {
 
       } catch (error) {
         lastError = error as Error;
-        
+
         // Don't retry auth errors or validation errors
         if (
           error instanceof AuthenticationError ||
@@ -273,7 +273,7 @@ export class SecureSysClient {
 
   async submitScan(scan: ScanSubmission): Promise<ScanResult> {
     const now = new Date().toISOString();
-    
+
     const body = {
       hostname: scan.hostname,
       scan_type: scan.scanType,
@@ -311,7 +311,7 @@ export class SecureSysClient {
       page: options?.page ?? 1,
       page_size: options?.pageSize ?? 20,
     };
-    
+
     if (options?.hostname) params.hostname = options.hostname;
     if (options?.status) params.status = options.status;
 

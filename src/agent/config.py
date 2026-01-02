@@ -11,19 +11,18 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
-
 # Fields that are filtered out when minimal_telemetry is enabled
 SENSITIVE_FIELDS = [
-    'ip_address',
-    'mac_address',
-    'user_home_paths',
-    'environment_variables',
-    'command_history',
-    'ssh_keys',
-    'private_keys',
-    'passwords',
-    'tokens',
-    'credentials',
+    "ip_address",
+    "mac_address",
+    "user_home_paths",
+    "environment_variables",
+    "command_history",
+    "ssh_keys",
+    "private_keys",
+    "passwords",
+    "tokens",
+    "credentials",
 ]
 
 
@@ -39,6 +38,7 @@ class Config:
         minimal_telemetry: When True, filters sensitive data from scan payloads
         allow_insecure_localhost: Allow HTTP for localhost (dev only)
     """
+
     api_url: Optional[str] = None
     api_key: Optional[str] = None
     system_id: Optional[str] = None
@@ -53,37 +53,37 @@ class Config:
 
 def get_config_path() -> Path:
     """Get the configuration file path."""
-    if os.name == 'nt':  # Windows
-        config_dir = Path(os.environ.get('APPDATA', '~')) / 'SecureSys'
+    if os.name == "nt":  # Windows
+        config_dir = Path(os.environ.get("APPDATA", "~")) / "SecureSys"
     else:  # Linux/macOS
-        config_dir = Path.home() / '.config' / 'securesys'
-    
+        config_dir = Path.home() / ".config" / "securesys"
+
     config_dir.mkdir(parents=True, exist_ok=True)
-    return config_dir / 'agent.json'
+    return config_dir / "agent.json"
 
 
 def load_config() -> Config:
     """Load configuration from file."""
     config_path = get_config_path()
-    
+
     if config_path.exists():
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 data = json.load(f)
                 return Config(**data)
         except Exception:
             pass
-    
+
     return Config()
 
 
 def save_config(config: Config) -> None:
     """Save configuration to file."""
     config_path = get_config_path()
-    
-    with open(config_path, 'w') as f:
+
+    with open(config_path, "w") as f:
         json.dump(config.to_dict(), f, indent=2)
-    
+
     # Secure the file permissions (Unix only)
-    if os.name != 'nt':
+    if os.name != "nt":
         os.chmod(config_path, 0o600)

@@ -123,11 +123,11 @@ src/backend/
 ```python
 class AuthProvider(ABC):
     """Abstract base for authentication providers."""
-    
+
     @abstractmethod
     def authenticate(self, request) -> AuthResult | None:
         pass
-    
+
     @abstractmethod
     def get_priority(self) -> int:
         pass
@@ -137,7 +137,7 @@ class AuthProvider(ABC):
 ```python
 class ProviderChainAuthentication(BaseAuthentication):
     """Tries authentication providers in priority order."""
-    
+
     def authenticate(self, request):
         for provider in self._providers:
             result = provider.authenticate(request)
@@ -150,7 +150,7 @@ class ProviderChainAuthentication(BaseAuthentication):
 ```python
 class ReportService:
     """Encapsulates PDF report generation logic."""
-    
+
     def generate_report(self, scan_id: str, user_id: str) -> ReportResult:
         # Business logic here, not in task or view
         pass
@@ -161,10 +161,10 @@ class ReportService:
 class WebhookEndpoint(models.Model):
     failure_count = models.IntegerField(default=0)
     circuit_open_until = models.DateTimeField(null=True)
-    
+
     FAILURE_THRESHOLD = 5
     CIRCUIT_TIMEOUT = timedelta(minutes=15)
-    
+
     def is_circuit_open(self) -> bool:
         if not self.circuit_open_until:
             return False
@@ -200,7 +200,7 @@ CELERY_TASK_ROUTES = {
 # base.py - Extensible foundation
 class BaseAsyncClient(ABC):
     """Abstract base for async HTTP clients."""
-    
+
     @abstractmethod
     async def _get_auth_headers(self) -> dict[str, str]:
         pass
@@ -213,7 +213,7 @@ class AuthStrategy(Protocol):
 class ScanTypeRegistry:
     """Registry pattern for scan type extensibility."""
     _scan_types: dict[str, ScanType] = {}
-    
+
     @classmethod
     def register(cls, scan_type: ScanType):
         cls._scan_types[scan_type.name] = scan_type

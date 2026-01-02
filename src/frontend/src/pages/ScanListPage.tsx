@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import { 
-  Search, 
+import { Link, useSearchParams } from 'react-router-dom'
+import {
+  Search,
   Scan,
   AlertTriangle,
   CheckCircle,
   Clock,
   XCircle,
-  ChevronRight
+  ChevronRight,
+  RefreshCw,
+  Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -16,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { scansApi } from '@/services/api'
 import { cn, formatDateTime, getRiskScoreColor, getMaturityLevelColor } from '@/lib/utils'
+import { useToast } from '@/components/ui/Toast'
 import type { Scan as ScanType } from '@/types'
 
 const statusConfig = {
@@ -44,7 +47,7 @@ const statusConfig = {
 function ScanStatusBadge({ status }: { status: ScanType['status'] }) {
   const config = statusConfig[status]
   const Icon = config.icon
-  
+
   return (
     <Badge className={cn('gap-1', config.color)}>
       <Icon className="h-3 w-3" />
@@ -56,22 +59,75 @@ function ScanStatusBadge({ status }: { status: ScanType['status'] }) {
 export default function ScanListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
-  
-  const { data: scans, isLoading, error, refetch } = useQuery<ScanType[]>({
+  const [searchParams] = useSearchParams()
+  const { addToast } = useToast()
+
+  const { data: scans, isLoading, error, refetch, isFetching } = useQuery<ScanType[]>({
     queryKey: ['scans'],
     queryFn: scansApi.getAll,
     refetchInterval: 10000, // Poll every 10 seconds for status updates
   })
 
+  // Check for severity filter from URL
+  const severityFilter = searchParams.get('severity')
+
   const filteredScans = scans?.filter(scan => {
-    const matchesSearch = 
+    const matchesSearch =
       scan.system_hostname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       scan.id.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesStatus = !statusFilter || scan.status === statusFilter
-    
+
     return matchesSearch && matchesStatus
   })
+
+  const handleRefresh = async () => {
+    await refetch()
+    addToast({
+      type: 'success',
+      title: 'Actualizado',
+      message: 'Lista de escaneos actualizada'
+    })
+  }
+
+  const handleExportCSV = () => {
+    if (!scans || scans.length === 0) {
+      addToast({
+        type: 'warning',
+        title: 'Sin datos',
+        message: 'No hay escaneos para exportar'
+      })
+      return
+    }
+
+    const headers = ['ID', 'Sistema', 'Estado', 'Risk Score', 'Maturity Level', 'Findings', 'Fecha']
+    const rows = scans.map(scan => [
+      scan.id,
+      scan.system_hostname || 'N/A',
+      scan.status,
+      scan.risk_score?.toString() || 'N/A',
+      scan.maturity_level || 'N/A',
+      scan.findings_count?.toString() || '0',
+      formatDateTime(scan.scan_date)
+    ])
+
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `scans-export-${new Date().toISOString().split('T')[0]}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    addToast({
+      type: 'success',
+      title: 'Exportado',
+      message: 'Escaneos exportados a CSV'
+    })
+  }
 
   if (isLoading) {
     return (
@@ -103,6 +159,16 @@ export default function ScanListPage() {
           <p className="text-muted-foreground">
             View and manage security scan results
           </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={handleRefresh} disabled={isFetching}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
+            Refresh
+          </Button>
         </div>
       </div>
 
@@ -193,10 +259,10 @@ export default function ScanListPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                       <ScanStatusBadge status={scan.status} />
-                      
+
                       {scan.status === 'completed' && (
                         <div className="text-right">
                           <div className={cn('text-lg font-bold', getRiskScoreColor(scan.risk_score || 0))}>
@@ -205,18 +271,18 @@ export default function ScanListPage() {
                           <div className="text-xs text-muted-foreground">Risk Score</div>
                         </div>
                       )}
-                      
+
                       {scan.maturity_level && (
                         <Badge className={getMaturityLevelColor(scan.maturity_level)}>
                           {scan.maturity_level}
                         </Badge>
                       )}
-                      
+
                       <div className="text-right">
                         <div className="font-semibold">{scan.findings_count || 0}</div>
                         <div className="text-xs text-muted-foreground">Findings</div>
                       </div>
-                      
+
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                   </div>

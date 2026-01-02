@@ -1,6 +1,6 @@
 /**
  * OIDC Authentication Service for Keycloak Integration
- * 
+ *
  * Handles OpenID Connect authentication flows with Keycloak including:
  * - Authorization Code flow with PKCE
  * - Token refresh
@@ -56,18 +56,18 @@ function generateRandomString(length: number): string {
  */
 async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
   const verifier = generateRandomString(64)
-  
+
   // Create SHA-256 hash of verifier
   const encoder = new TextEncoder()
   const data = encoder.encode(verifier)
   const hash = await crypto.subtle.digest('SHA-256', data)
-  
+
   // Base64url encode the hash
   const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
-  
+
   return { verifier, challenge }
 }
 

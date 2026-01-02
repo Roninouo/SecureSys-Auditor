@@ -12,7 +12,7 @@ datasources:
       timeInterval: "15s"
       queryTimeout: "60s"
       httpMethod: "POST"
-  
+
   - name: Jaeger
     type: jaeger
     access: proxy
@@ -26,7 +26,7 @@ datasources:
         mapTagNamesEnabled: true
         filterByTraceID: true
         filterBySpanID: false
-  
+
   - name: AlertManager
     type: alertmanager
     access: proxy

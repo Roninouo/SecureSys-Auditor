@@ -13,13 +13,13 @@ resources:
   - base/namespace.yaml
   - base/configmap.yaml
   - base/service-account.yaml
-  
+
   # Backend API
   - backend/deployment.yaml
   - backend/service.yaml
   - backend/hpa.yaml
   - backend/pdb.yaml
-  
+
   # Celery workers
   - worker/deployment.yaml
   - worker/hpa.yaml
@@ -29,11 +29,11 @@ resources:
   - frontend/deployment.yaml
   - frontend/service.yaml
   - frontend/hpa.yaml
-  
+
   # Ingress
   - ingress/ingress.yaml
   - ingress/certificate.yaml
-  
+
   # Monitoring
   - monitoring/service-monitor.yaml
 

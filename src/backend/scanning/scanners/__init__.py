@@ -6,4 +6,4 @@ Contains various scanner implementations:
 """
 from .url_scanner import URLScanner, URLScanResult
 
-__all__ = ['URLScanner', 'URLScanResult']
+__all__ = ["URLScanner", "URLScanResult"]

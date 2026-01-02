@@ -41,20 +41,20 @@ python manage.py migrate_scanning_data --verify
 ### Step 1: Pre-Migration Checklist
 
 1. **Backup Database**
-   
+
    Use the provided backup script which supports encryption and offsite storage:
    ```bash
    # Run backup script
    ./scripts/db-backup.sh
    ```
-   
+
    Ensure `BACKUP_ENCRYPTION_KEY` and `AWS_S3_BUCKET` are set in your environment for encryption and offsite backup.
 
    Alternatively, use the management command or manual dump:
    ```bash
    # Automated backup (recommended)
    python manage.py migrate_scanning_data --backup
-   
+
    # Manual PostgreSQL backup
    pg_dump -U securesys_user -h localhost securesys_db > backup_$(date +%Y%m%d_%H%M%S).sql
    ```
@@ -87,7 +87,7 @@ python manage.py migrate_scanning_data --verify
 1. **Check Record Counts**
    ```python
    from scanning.models import System, Scan, Finding, Recommendation
-   
+
    print(f"Systems: {System.objects.count()}")
    print(f"Scans: {Scan.objects.count()}")
    print(f"Findings: {Finding.objects.count()}")
@@ -131,10 +131,10 @@ python manage.py dbshell
    ```bash
    # Stop application
    docker-compose down
-   
+
    # Restore database
    psql -U securesys_user -h localhost securesys_db < backup_20231223_143022.sql
-   
+
    # Restart application
    docker-compose up -d
    ```
@@ -183,16 +183,16 @@ deploy:
   script:
     # 1. Create backup
     - python manage.py migrate_scanning_data --backup
-    
+
     # 2. Run migrations
     - python manage.py migrate
-    
+
     # 3. Migrate data
     - python manage.py migrate_scanning_data
-    
+
     # 4. Verify
     - python manage.py migrate_scanning_data --verify
-    
+
     # 5. Run smoke tests
     - python manage.py test tests.smoke
 ```
@@ -230,11 +230,11 @@ This checks:
 
 ```sql
 -- Check for missing systems
-SELECT COUNT(*) FROM core_system 
+SELECT COUNT(*) FROM core_system
 WHERE id NOT IN (SELECT id FROM scanning_systems);
 
 -- Check for missing scans
-SELECT COUNT(*) FROM core_scan 
+SELECT COUNT(*) FROM core_scan
 WHERE id NOT IN (SELECT id FROM scanning_scans);
 
 -- Verify relationships
@@ -263,11 +263,11 @@ ORDER BY scan_count DESC;
 **Solution**:
 ```sql
 -- Find orphaned scans
-SELECT * FROM scanning_scans 
+SELECT * FROM scanning_scans
 WHERE system_id NOT IN (SELECT id FROM scanning_systems);
 
 -- Clean up (if appropriate)
-DELETE FROM scanning_scans 
+DELETE FROM scanning_scans
 WHERE system_id NOT IN (SELECT id FROM scanning_systems);
 ```
 

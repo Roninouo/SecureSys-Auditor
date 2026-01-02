@@ -30,7 +30,7 @@ export const options = {
       ],
       gracefulRampDown: '30s',
     },
-    
+
     // Scenario 2: Spike test - sudden traffic surge
     spike_test: {
       executor: 'ramping-vus',
@@ -44,7 +44,7 @@ export const options = {
       ],
       startTime: '10m',  // Start after normal_load
     },
-    
+
     // Scenario 3: Stress test - find breaking point
     stress_test: {
       executor: 'ramping-arrival-rate',
@@ -61,14 +61,14 @@ export const options = {
       startTime: '20m',  // Start after spike_test
     },
   },
-  
+
   thresholds: {
     // Response time thresholds
     http_req_duration: ['p(95)<2000', 'p(99)<5000'],  // 95% under 2s, 99% under 5s
-    
+
     // Error rate thresholds
     errors: ['rate<0.05'],  // Less than 5% errors
-    
+
     // Custom metric thresholds
     scan_submission_time: ['p(95)<3000'],  // Scan submissions under 3s
   },
@@ -90,7 +90,7 @@ const severities = ['critical', 'high', 'medium', 'low', 'info'];
 function generateScanPayload() {
   const hostname = randomItem(systemHosts);
   const numFindings = randomIntBetween(5, 50);
-  
+
   const findings = [];
   for (let i = 0; i < numFindings; i++) {
     findings.push({
@@ -101,7 +101,7 @@ function generateScanPayload() {
       affected_component: `/usr/local/bin/app-${randomIntBetween(1, 10)}`,
     });
   }
-  
+
   return {
     hostname: hostname,
     scan_type: randomItem(scanTypes),
@@ -124,7 +124,7 @@ export function setup() {
   check(res, {
     'Health check passes': (r) => r.status === 200,
   });
-  
+
   return { startTime: Date.now() };
 }
 
@@ -135,7 +135,7 @@ export default function (data) {
     'Authorization': `Bearer ${API_KEY}`,
     'X-Request-ID': `k6-${__VU}-${__ITER}-${Date.now()}`,
   };
-  
+
   group('Health Checks', function () {
     const res = http.get(`${BASE_URL}/api/v1/health/`, { headers });
     check(res, {
@@ -144,20 +144,20 @@ export default function (data) {
     });
     errorRate.add(res.status !== 200);
   });
-  
+
   group('Scan Submission', function () {
     const payload = generateScanPayload();
     const startTime = Date.now();
-    
+
     const res = http.post(
       `${BASE_URL}/api/v1/scans/`,
       JSON.stringify(payload),
       { headers }
     );
-    
+
     const duration = Date.now() - startTime;
     scanSubmissionTime.add(duration);
-    
+
     const success = check(res, {
       'Scan submission status 201': (r) => r.status === 201,
       'Scan has ID': (r) => {
@@ -169,16 +169,16 @@ export default function (data) {
       },
       'Response time < 3s': (r) => r.timings.duration < 3000,
     });
-    
+
     errorRate.add(!success);
-    
+
     if (success) {
       scanCount.add(1);
     }
-    
+
     sleep(randomIntBetween(1, 3));
   });
-  
+
   group('List Scans', function () {
     const res = http.get(`${BASE_URL}/api/v1/scans/?page=1&page_size=20`, { headers });
     check(res, {
@@ -194,7 +194,7 @@ export default function (data) {
     });
     errorRate.add(res.status !== 200);
   });
-  
+
   group('Get Scan Details', function () {
     // First get a scan ID
     const listRes = http.get(`${BASE_URL}/api/v1/scans/?page=1&page_size=1`, { headers });
@@ -215,7 +215,7 @@ export default function (data) {
       }
     }
   });
-  
+
   group('Dashboard Stats', function () {
     const res = http.get(`${BASE_URL}/api/v1/dashboard/stats/`, { headers });
     check(res, {
@@ -223,7 +223,7 @@ export default function (data) {
     });
     errorRate.add(res.status !== 200);
   });
-  
+
   sleep(randomIntBetween(2, 5));
 }
 

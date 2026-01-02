@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { 
-  ArrowLeft, 
-  AlertTriangle, 
+import {
+  ArrowLeft,
+  AlertTriangle,
   CheckCircle,
   Clock,
   Shield,
@@ -17,10 +17,10 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { scansApi } from '@/services/api'
-import { 
-  cn, 
-  formatDateTime, 
-  getRiskScoreColor, 
+import {
+  cn,
+  formatDateTime,
+  getRiskScoreColor,
   getMaturityLevelColor,
   getStatusColor,
   getSeverityColor
@@ -183,9 +183,9 @@ export default function ScanDetailPage() {
                 <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
                   {urlPayload.url}
                 </span>
-                <a 
-                  href={urlPayload.url} 
-                  target="_blank" 
+                <a
+                  href={urlPayload.url}
+                  target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Open scanned URL in a new tab"
                   title="Open scanned URL"
@@ -244,7 +244,7 @@ export default function ScanDetailPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm font-medium text-muted-foreground">Maturity Level</div>
@@ -259,7 +259,7 @@ export default function ScanDetailPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm font-medium text-muted-foreground">Total Findings</div>
@@ -268,7 +268,7 @@ export default function ScanDetailPage() {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
