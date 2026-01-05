@@ -9,14 +9,12 @@ import {
   Activity,
   Play,
   Trash2,
-  Edit,
   Loader2,
   Globe
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { Input } from '@/components/ui/Input'
 import { systemsApi, scansApi } from '@/services/api'
 import { useToast } from '@/components/ui/Toast'
 import {

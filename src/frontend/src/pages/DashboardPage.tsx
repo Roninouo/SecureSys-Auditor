@@ -13,9 +13,8 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { dashboardApi, findingsApi } from '@/services/api'
+import { dashboardApi } from '@/services/api'
 import { cn, getRiskScoreColor } from '@/lib/utils'
 import { useToast } from '@/components/ui/Toast'
 import type { DashboardStats } from '@/types'

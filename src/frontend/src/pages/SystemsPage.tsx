@@ -8,9 +8,7 @@ import {
   Globe,
   AlertTriangle,
   ChevronRight,
-  Loader2,
-  Trash2,
-  RefreshCw
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -150,26 +148,6 @@ export default function SystemsPage() {
     }
   })
 
-  // Delete system mutation
-  const deleteSystemMutation = useMutation({
-    mutationFn: (id: string) => systemsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['systems'] })
-      addToast({
-        type: 'success',
-        title: 'Sistema eliminado',
-        message: 'El sistema ha sido eliminado correctamente'
-      })
-    },
-    onError: (error: Error) => {
-      addToast({
-        type: 'error',
-        title: 'Error',
-        message: error.message || 'No se pudo eliminar el sistema'
-      })
-    }
-  })
-
   const handleAddWebsite = () => {
     if (!websiteUrl.trim()) return
     urlScanMutation.mutate({
@@ -188,14 +166,6 @@ export default function SystemsPage() {
       description: serverDesc || undefined,
       ip_address: serverIP || undefined,
     })
-  }
-
-  const handleDeleteSystem = (e: React.MouseEvent, systemId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (window.confirm('¿Estás seguro de que quieres eliminar este sistema?')) {
-      deleteSystemMutation.mutate(systemId)
-    }
   }
 
   const searchFiltered = systems?.filter(system =>

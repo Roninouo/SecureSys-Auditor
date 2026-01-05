@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { useState, createContext, useContext, useCallback } from 'react'
 import { X, CheckCircle, AlertTriangle, Info, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 

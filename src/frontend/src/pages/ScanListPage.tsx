@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Search,
   Scan,
@@ -59,7 +59,6 @@ function ScanStatusBadge({ status }: { status: ScanType['status'] }) {
 export default function ScanListPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
-  const [searchParams] = useSearchParams()
   const { addToast } = useToast()
 
   const { data: scans, isLoading, error, refetch, isFetching } = useQuery<ScanType[]>({
@@ -67,9 +66,6 @@ export default function ScanListPage() {
     queryFn: scansApi.getAll,
     refetchInterval: 10000, // Poll every 10 seconds for status updates
   })
-
-  // Check for severity filter from URL
-  const severityFilter = searchParams.get('severity')
 
   const filteredScans = scans?.filter(scan => {
     const matchesSearch =
