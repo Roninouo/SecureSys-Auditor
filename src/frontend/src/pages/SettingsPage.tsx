@@ -5,19 +5,22 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuthStore } from '@/stores/authStore'
 import { useToast } from '@/components/ui/Toast'
+import { usePreferencesStore } from '@/stores/preferencesStore'
 
 export default function SettingsPage() {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
   const { addToast } = useToast()
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+  const showSyntheticData = usePreferencesStore((s) => s.showSyntheticData)
+  const toggleShowSyntheticData = usePreferencesStore((s) => s.toggleShowSyntheticData)
 
   const handleLogout = () => {
     logout()
     addToast({
       type: 'success',
-      title: 'Sesión cerrada',
-      message: 'Has cerrado sesión correctamente'
+      title: 'Logged Out',
+      message: 'You have successfully logged out'
     })
   }
 
@@ -38,8 +41,8 @@ export default function SettingsPage() {
     }
     addToast({
       type: 'success',
-      title: 'Tema actualizado',
-      message: `Tema cambiado a ${newTheme === 'system' ? 'automático' : newTheme === 'dark' ? 'oscuro' : 'claro'}`
+      title: 'Theme Updated',
+      message: `Theme changed to ${newTheme === 'system' ? 'automatic' : newTheme === 'dark' ? 'dark' : 'light'}`
     })
   }
 
@@ -48,8 +51,19 @@ export default function SettingsPage() {
     localStorage.removeItem('auth-storage')
     addToast({
       type: 'info',
-      title: 'Caché limpiado',
-      message: 'Se ha limpiado la caché de la aplicación. Recarga la página para aplicar los cambios.'
+      title: 'Cache Cleared',
+      message: 'The application cache has been cleared. Reload the page to apply the changes.'
+    })
+  }
+
+  const handleToggleSyntheticData = () => {
+    toggleShowSyntheticData()
+    addToast({
+      type: 'success',
+      title: 'Preference updated',
+      message: showSyntheticData
+        ? 'The synthetic data is now hidden'
+        : 'The synthetic data is now shown',
     })
   }
 
@@ -197,6 +211,18 @@ export default function SettingsPage() {
 
             <div className="mt-4 text-sm text-muted-foreground">
               Clear cached data if you experience issues with the application.
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <div className="text-sm">
+                <div className="font-medium">Synth data</div>
+                <div className="text-muted-foreground">
+                  Hide or show synthetic data (real data is always preserved).
+                </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleToggleSyntheticData}>
+                {showSyntheticData ? 'Hide' : 'Show'}
+              </Button>
             </div>
 
             <div className="mt-4">

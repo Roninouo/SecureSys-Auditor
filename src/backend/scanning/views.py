@@ -17,7 +17,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from django.db.models import Avg, Count
+from django.db.models import Avg, Count, Q
 from django.utils import timezone
 
 from .models import Finding, Recommendation, Scan, System
@@ -38,6 +38,28 @@ from .serializers import (
 from .tasks import process_scan_task
 
 logger = logging.getLogger(__name__)
+
+
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _synthetic_system_q(prefix: str = "") -> Q:
+    field = f"{prefix}description" if prefix else "description"
+    return (
+        Q(**{f"{field}__icontains": "auto-generated"})
+        | Q(**{f"{field}__icontains": "synthetic"})
+        | Q(**{f"{field}__icontains": "for testing"})
+    )
+
+
+def _exclude_synthetic_systems(qs, request, *, prefix: str = ""):
+    include_synthetic = _is_truthy(request.query_params.get("include_synthetic"))
+    if include_synthetic:
+        return qs
+    return qs.exclude(_synthetic_system_q(prefix=prefix))
 
 
 # ============================================================================
@@ -101,6 +123,10 @@ class SystemViewSet(viewsets.ModelViewSet):
     filterset_fields = ["environment", "os"]
     search_fields = ["hostname", "os", "description"]
     ordering_fields = ["hostname", "created_at", "last_seen", "latest_risk_score"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return _exclude_synthetic_systems(qs, self.request)
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -171,6 +197,11 @@ class ScanViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["status", "system", "maturity_level", "scan_type"]
     ordering_fields = ["scan_date", "risk_score"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        # Synthetic is derived from the related System.description
+        return _exclude_synthetic_systems(qs, self.request, prefix="system__")
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -277,6 +308,10 @@ class FindingViewSet(viewsets.ModelViewSet):
     filterset_fields = ["severity", "category", "is_resolved", "scan"]
     ordering_fields = ["severity", "created_at"]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return _exclude_synthetic_systems(qs, self.request, prefix="scan__system__")
+
     def get_serializer_class(self):
         if self.action == "list":
             return FindingListSerializer
@@ -365,33 +400,41 @@ class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        include_synthetic = _is_truthy(request.query_params.get("include_synthetic"))
+
+        systems_qs = System.objects.filter(is_active=True)
+        scans_qs = Scan.objects.all()
+        findings_qs = Finding.objects.all()
+
+        if not include_synthetic:
+            systems_qs = systems_qs.exclude(_synthetic_system_q())
+            scans_qs = scans_qs.exclude(_synthetic_system_q(prefix="system__"))
+            findings_qs = findings_qs.exclude(_synthetic_system_q(prefix="scan__system__"))
+
         # System counts
-        total_systems = System.objects.filter(is_active=True).count()
+        total_systems = systems_qs.count()
         systems_by_env = dict(
-            System.objects.filter(is_active=True)
-            .values("environment")
-            .annotate(count=Count("id"))
-            .values_list("environment", "count")
+            systems_qs.values("environment").annotate(count=Count("id")).values_list("environment", "count")
         )
 
         # Scan counts
-        total_scans = Scan.objects.count()
-        completed_scans = Scan.objects.filter(status=Scan.Status.COMPLETED).count()
+        total_scans = scans_qs.count()
+        completed_scans = scans_qs.filter(status=Scan.Status.COMPLETED).count()
 
         # Risk score average (only completed scans)
         avg_risk = (
-            Scan.objects.filter(status=Scan.Status.COMPLETED, risk_score__isnull=False).aggregate(
-                avg=Avg("risk_score")
-            )["avg"]
+            scans_qs.filter(status=Scan.Status.COMPLETED, risk_score__isnull=False).aggregate(avg=Avg("risk_score"))[
+                "avg"
+            ]
             or 0
         )
 
         # Unresolved findings count
-        total_unresolved = Finding.objects.filter(is_resolved=False).count()
+        total_unresolved = findings_qs.filter(is_resolved=False).count()
 
         # Severity counts for unresolved findings
         severity_counts = dict(
-            Finding.objects.filter(is_resolved=False)
+            findings_qs.filter(is_resolved=False)
             .values("severity")
             .annotate(count=Count("id"))
             .values_list("severity", "count")
@@ -403,7 +446,7 @@ class DashboardStatsView(APIView):
                 severity_counts[severity] = 0
 
         # Recent scans (last 10)
-        recent_scans = Scan.objects.select_related("system").order_by("-scan_date")[:10]
+        recent_scans = scans_qs.select_related("system").order_by("-scan_date")[:10]
         recent_scans_data = ScanListSerializer(recent_scans, many=True).data
 
         return Response(

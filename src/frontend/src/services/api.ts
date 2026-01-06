@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
+import { usePreferencesStore } from '../stores/preferencesStore'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
 
@@ -173,7 +174,10 @@ export const reportsApi = {
 // Systems API (uses new scanning module)
 export const systemsApi = {
   getAll: async () => {
-    const response = await scanningApi.get('/systems/')
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const response = await scanningApi.get('/systems/', {
+      params: includeSynthetic ? { include_synthetic: true } : undefined,
+    })
     return response.data.results || response.data
   },
 
@@ -210,7 +214,10 @@ export const systemsApi = {
   },
 
   getScans: async (systemId: string) => {
-    const response = await scanningApi.get(`/systems/${systemId}/scans/`)
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const response = await scanningApi.get(`/systems/${systemId}/scans/`, {
+      params: includeSynthetic ? { include_synthetic: true } : undefined,
+    })
     return response.data
   },
 
@@ -225,7 +232,10 @@ export const systemsApi = {
 // Scans API (uses new scanning module)
 export const scansApi = {
   getAll: async () => {
-    const response = await scanningApi.get('/scans/')
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const response = await scanningApi.get('/scans/', {
+      params: includeSynthetic ? { include_synthetic: true } : undefined,
+    })
     return response.data.results || response.data
   },
 
@@ -240,9 +250,12 @@ export const scansApi = {
   },
 
   getFindings: async (scanId: string, filters?: { severity?: string; category?: string }) => {
-    const response = await scanningApi.get(`/scans/${scanId}/findings/`, {
-      params: filters
-    })
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const params = {
+      ...(filters || {}),
+      ...(includeSynthetic ? { include_synthetic: true } : {}),
+    }
+    const response = await scanningApi.get(`/scans/${scanId}/findings/`, { params })
     return response.data
   },
 
@@ -261,7 +274,12 @@ export const scansApi = {
 // Findings API (uses new scanning module)
 export const findingsApi = {
   getAll: async (filters?: { severity?: string; category?: string; is_resolved?: boolean }) => {
-    const response = await scanningApi.get('/findings/', { params: filters })
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const params = {
+      ...(filters || {}),
+      ...(includeSynthetic ? { include_synthetic: true } : {}),
+    }
+    const response = await scanningApi.get('/findings/', { params })
     return response.data.results || response.data
   },
 
@@ -289,7 +307,10 @@ export const findingsApi = {
 // Dashboard API (uses new scanning module)
 export const dashboardApi = {
   getStats: async () => {
-    const response = await scanningApi.get('/dashboard/stats/')
+    const includeSynthetic = usePreferencesStore.getState().showSyntheticData
+    const response = await scanningApi.get('/dashboard/stats/', {
+      params: includeSynthetic ? { include_synthetic: true } : undefined,
+    })
     return response.data
   },
 }
