@@ -91,22 +91,38 @@ class ReportGenerationView(APIView):
 
         if async_generation:
             # Queue async report generation
-            task = generate_pdf_report_task.delay(
-                scan_id=str(scan_id),
-                report_type=report_type,
-                company_name=company_name,
-                requested_by_id=str(request.user.id),
-            )
+            try:
+                task = generate_pdf_report_task.delay(
+                    scan_id=str(scan_id),
+                    report_type=report_type,
+                    company_name=company_name,
+                    requested_by_id=str(request.user.id),
+                )
+                task_id = task.id
+            except Exception as e:
+                # Common on dev setups (Windows) when a broker/worker isn't running.
+                logger.warning(
+                    f"Celery unavailable for report generation; falling back to local async execution: {e}",
+                    exc_info=True,
+                )
+                from .local_tasks import enqueue_local_report_generation
+
+                task_id = enqueue_local_report_generation(
+                    scan_id=str(scan_id),
+                    report_type=report_type,
+                    company_name=company_name,
+                    requested_by_id=str(request.user.id),
+                )
 
             logger.info(
                 f"Report generation queued: scan={scan_id}, type={report_type}, "
-                f"task={task.id}, user={request.user.email}"
+                f"task={task_id}, user={request.user.email}"
             )
 
             return Response(
                 {
                     "message": "Report generation started",
-                    "task_id": task.id,
+                    "task_id": task_id,
                     "scan_id": str(scan_id),
                     "report_type": report_type,
                     "status": "processing",
@@ -147,6 +163,17 @@ class ReportGenerationView(APIView):
         if not task_id:
             return Response({"error": "task_id query parameter required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Check local fallback task store first
+        try:
+            from .local_tasks import get_local_task_status
+
+            local_status = get_local_task_status(task_id)
+            if local_status is not None:
+                return Response(local_status)
+        except Exception:
+            # Local task store must never break status checks
+            logger.debug("Local task status lookup failed", exc_info=True)
+
         result = AsyncResult(task_id)
 
         if result.state == "PENDING":
@@ -157,9 +184,8 @@ class ReportGenerationView(APIView):
             report_info = result.result
             return Response({"task_id": task_id, "status": "completed", "report": report_info})
         elif result.state == "FAILURE":
-            return Response(
-                {"task_id": task_id, "status": "failed", "error": str(result.result)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            # Return 200 so clients can render the failure reason (treating 5xx as a network error
+            # loses the task status payload).
+            return Response({"task_id": task_id, "status": "failed", "error": str(result.result)})
         else:
             return Response({"task_id": task_id, "status": result.state.lower()})

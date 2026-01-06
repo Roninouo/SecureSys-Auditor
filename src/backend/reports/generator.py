@@ -22,6 +22,20 @@ try:
 except (ImportError, OSError) as e:
     logger.warning(f"WeasyPrint not available. PDF generation will be disabled. Error: {e}")
 
+# Try to import ReportLab (pure-Python wheels on most platforms)
+REPORTLAB_AVAILABLE = False
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    REPORTLAB_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"ReportLab not available. Fallback PDF generation disabled. Error: {e}")
+
+PDF_GENERATION_AVAILABLE = WEASYPRINT_AVAILABLE or REPORTLAB_AVAILABLE
+
 
 # NIST CSF Control Mapping
 NIST_CONTROL_MAPPING = {
@@ -127,29 +141,140 @@ class PDFReportGenerator:
         Returns:
             PDF content as bytes
         """
-        if not WEASYPRINT_AVAILABLE:
-            raise RuntimeError("WeasyPrint not available")
-
-        # Build context
+        # Build context once; shared across engines
         context = self._build_context(scan, report_type, company_name)
 
-        # Render HTML
-        template_name = f"reports/{report_type}_report.html"
-        try:
-            html_content = render_to_string(template_name, context)
-        except Exception:
-            # Fallback to inline template
-            html_content = self._render_inline_template(context, report_type)
+        if WEASYPRINT_AVAILABLE:
+            # Render HTML
+            template_name = f"reports/{report_type}_report.html"
+            try:
+                html_content = render_to_string(template_name, context)
+            except Exception:
+                # Fallback to inline template
+                html_content = self._render_inline_template(context, report_type)
 
-        # Generate PDF
-        font_config = FontConfiguration()
-        html = HTML(string=html_content)
-        css = CSS(string=self.BASE_CSS, font_config=font_config)
+            # Generate PDF
+            font_config = FontConfiguration()
+            html = HTML(string=html_content)
+            css = CSS(string=self.BASE_CSS, font_config=font_config)
 
-        pdf_buffer = io.BytesIO()
-        html.write_pdf(pdf_buffer, stylesheets=[css], font_config=font_config)
+            pdf_buffer = io.BytesIO()
+            html.write_pdf(pdf_buffer, stylesheets=[css], font_config=font_config)
+            return pdf_buffer.getvalue()
 
-        return pdf_buffer.getvalue()
+        if REPORTLAB_AVAILABLE:
+            return self._generate_with_reportlab(context=context, report_type=report_type)
+
+        raise RuntimeError("No PDF engine available (WeasyPrint/ReportLab)")
+
+    def _generate_with_reportlab(self, context: Dict[str, Any], report_type: str) -> bytes:
+        """Generate a PDF using ReportLab (fallback when WeasyPrint isn't available)."""
+        styles = getSampleStyleSheet()
+        buffer = io.BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=36,
+            rightMargin=36,
+            topMargin=36,
+            bottomMargin=36,
+            title="SecureSys Security Assessment Report",
+        )
+
+        scan = context["scan"]
+        system = context["system"]
+        generated_at = context.get("generated_at")
+        company_name = context.get("company_name")
+
+        story = []
+        story.append(Paragraph("SecureSys Security Assessment Report", styles["Title"]))
+        story.append(Spacer(1, 8))
+        story.append(Paragraph(f"Company: {company_name}", styles["Normal"]))
+        story.append(Paragraph(f"System: {getattr(system, 'hostname', 'Unknown')}", styles["Normal"]))
+        if generated_at:
+            story.append(Paragraph(f"Generated: {generated_at.strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
+        story.append(Paragraph(f"Report type: {report_type.title()}", styles["Normal"]))
+        story.append(Spacer(1, 14))
+
+        # Summary
+        risk_score = getattr(scan, "risk_score", None)
+        maturity_level = getattr(scan, "maturity_level", None)
+        summary_rows = [
+            ["Risk Score", str(risk_score) if risk_score is not None else "N/A"],
+            ["Maturity Level", str(maturity_level) if maturity_level else "N/A"],
+            ["Total Findings", str(context.get("total_findings", 0))],
+            ["Critical", str(context.get("critical_count", 0))],
+            ["High", str(context.get("high_count", 0))],
+            ["Medium", str(context.get("medium_count", 0))],
+            ["Low", str(context.get("low_count", 0))],
+        ]
+
+        story.append(Paragraph("Summary", styles["Heading2"]))
+        table = Table(summary_rows, hAlign="LEFT", colWidths=[120, 360])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        story.append(table)
+        story.append(Spacer(1, 14))
+
+        findings = context.get("findings", []) or []
+
+        def _finding_line(f):
+            title = getattr(f, "title", "Untitled")
+            severity = getattr(f, "severity", "unknown")
+            category = getattr(f, "category", "uncategorized")
+            return f"[{severity.upper()}] {title} ({category})"
+
+        if report_type == "executive":
+            story.append(Paragraph("Top Findings", styles["Heading2"]))
+            # Prefer critical/high first
+            severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+            sorted_findings = sorted(
+                findings, key=lambda f: (severity_order.get(getattr(f, "severity", ""), 99), getattr(f, "title", ""))
+            )
+            for f in sorted_findings[:10]:
+                story.append(Paragraph(_finding_line(f), styles["Normal"]))
+            story.append(Spacer(1, 10))
+
+        elif report_type == "compliance":
+            story.append(Paragraph("Compliance Mapping", styles["Heading2"]))
+            category_groups = context.get("category_groups", {}) or {}
+            for category, group in category_groups.items():
+                control = (group or {}).get("control") or {}
+                nist_id = control.get("nist_id", "")
+                nist_name = control.get("nist_name", "")
+                iso_control = control.get("iso_control", "")
+                story.append(Paragraph(f"Category: {category}", styles["Heading3"]))
+                if nist_id or nist_name:
+                    story.append(Paragraph(f"NIST: {nist_id} {nist_name}", styles["Normal"]))
+                if iso_control:
+                    story.append(Paragraph(f"ISO 27001: {iso_control}", styles["Normal"]))
+                group_findings = (group or {}).get("findings") or []
+                for f in group_findings:
+                    story.append(Paragraph(_finding_line(f), styles["Normal"]))
+                story.append(Spacer(1, 10))
+
+        else:
+            # technical
+            story.append(Paragraph("Detailed Findings", styles["Heading2"]))
+            for f in findings:
+                story.append(Paragraph(_finding_line(f), styles["Heading3"]))
+                desc = getattr(f, "description", "")
+                if desc:
+                    story.append(Paragraph(desc, styles["BodyText"]))
+                story.append(Spacer(1, 8))
+
+        doc.build(story)
+        return buffer.getvalue()
 
     def _build_context(self, scan, report_type: str, company_name: str) -> Dict[str, Any]:
         """Build template context from scan data."""
