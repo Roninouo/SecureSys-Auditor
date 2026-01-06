@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { systemsApi, scansApi } from '@/services/api'
 import { useToast } from '@/components/ui/Toast'
+import { safeLabel } from '@/lib/labels'
 import {
   cn,
   formatDateTime,
@@ -176,7 +177,9 @@ export default function SystemDetailPage() {
             <div>
               <h1 className="text-2xl font-bold">{system.hostname}</h1>
               <p className="text-muted-foreground">
-                {system.system_type === 'website' ? system.url : `${system.os} ${system.os_version || ''}`}
+                {system.system_type === 'website'
+                  ? (system.url ?? 'N/A')
+                  : `${safeLabel(system.os, 'N/A')} ${safeLabel(system.os_version, '')}`}
               </p>
             </div>
           </div>
@@ -204,7 +207,7 @@ export default function SystemDetailPage() {
             <div className="text-sm font-medium text-muted-foreground">Environment</div>
             <div className="mt-1">
               <Badge variant="outline" className="capitalize">
-                {system.environment}
+                {safeLabel(system.environment, 'N/A')}
               </Badge>
             </div>
           </CardContent>

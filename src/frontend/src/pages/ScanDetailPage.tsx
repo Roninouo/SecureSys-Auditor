@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { scansApi } from '@/services/api'
+import { safeLabel } from '@/lib/labels'
 import {
   cn,
   formatDateTime,
@@ -138,12 +139,13 @@ export default function ScanDetailPage() {
 
   const isUrlScan = scan.scan_type === 'url_scan'
   const urlPayload = scan.scan_payload
+  const findings = scan.findings ?? []
 
   const guidanceByFindingId = useMemo(() => {
     const map = new Map<string, FindingGuidance>()
-    ;(scan.findings || []).forEach((f) => map.set(f.id, buildFindingGuidance(f)))
+    ;(findings).forEach((f) => map.set(f.id, buildFindingGuidance(f)))
     return map
-  }, [scan.findings])
+  }, [findings])
 
   return (
     <div className="space-y-6">
@@ -181,8 +183,9 @@ export default function ScanDetailPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                  {urlPayload.url}
+                  {urlPayload.url ?? 'N/A'}
                 </span>
+                {urlPayload.url ? (
                 <a
                   href={urlPayload.url}
                   target="_blank"
@@ -193,6 +196,7 @@ export default function ScanDetailPage() {
                 >
                   <ExternalLink className="h-4 w-4" />
                 </a>
+                ) : null}
               </div>
               {urlPayload.final_url && urlPayload.final_url !== urlPayload.url && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -214,14 +218,14 @@ export default function ScanDetailPage() {
                 <div>
                   <span className="text-sm text-muted-foreground">Response Time</span>
                   <div className="text-lg font-semibold">
-                    {Math.round(urlPayload.response_time_ms)}ms
+                    {Math.round(urlPayload.response_time_ms ?? 0)}ms
                   </div>
                 </div>
-                {urlPayload.redirects && urlPayload.redirects.length > 0 && (
+                {(urlPayload.redirects ?? []).length > 0 && (
                   <div>
                     <span className="text-sm text-muted-foreground">Redirects</span>
                     <div className="text-lg font-semibold">
-                      {urlPayload.redirects.length}
+                      {(urlPayload.redirects ?? []).length}
                     </div>
                   </div>
                 )}
@@ -264,7 +268,7 @@ export default function ScanDetailPage() {
           <CardContent className="pt-6">
             <div className="text-sm font-medium text-muted-foreground">Total Findings</div>
             <div className="text-3xl font-bold mt-2">
-              {scan.findings?.length || scan.findings_count || 0}
+              {findings.length || scan.findings_count || 0}
             </div>
           </CardContent>
         </Card>
@@ -331,7 +335,7 @@ export default function ScanDetailPage() {
                 <div>
                   <span className="text-sm text-muted-foreground">Issuer</span>
                   <div className="text-sm mt-1 truncate" title={urlPayload.ssl_info.issuer}>
-                    {urlPayload.ssl_info.issuer.split(',')[0]}
+                    {String(urlPayload.ssl_info.issuer ?? '').split(',')[0]}
                   </div>
                 </div>
               )}
@@ -365,11 +369,11 @@ export default function ScanDetailPage() {
             <CardDescription>HTTP security headers analysis</CardDescription>
           </CardHeader>
           <CardContent>
-            {urlPayload.security_headers.missing_headers && urlPayload.security_headers.missing_headers.length > 0 && (
+            {(urlPayload.security_headers?.missing_headers ?? []).length > 0 && (
               <div className="mb-4">
                 <h4 className="text-sm font-medium text-red-600 mb-2">Missing Headers</h4>
                 <div className="flex flex-wrap gap-2">
-                  {urlPayload.security_headers.missing_headers.map((header) => (
+                  {(urlPayload.security_headers?.missing_headers ?? []).map((header) => (
                     <Badge key={header} variant="outline" className="text-red-600 border-red-300">
                       {header}
                     </Badge>
@@ -459,9 +463,9 @@ export default function ScanDetailPage() {
           <CardDescription>Security issues detected during this scan</CardDescription>
         </CardHeader>
         <CardContent>
-          {scan.findings && scan.findings.length > 0 ? (
+          {findings.length > 0 ? (
             <div className="space-y-4">
-              {scan.findings.map((finding: Finding) => (
+              {findings.map((finding: Finding) => (
                 <div key={finding.id} className="rounded-lg border">
                   <div
                     role="button"
@@ -493,7 +497,7 @@ export default function ScanDetailPage() {
                       <div>
                         <div className="font-medium">{finding.title}</div>
                         <div className="text-sm text-muted-foreground capitalize">
-                          {finding.category.replace(/_/g, ' ')}
+                          {safeLabel(finding.category)}
                         </div>
                       </div>
                     </div>
