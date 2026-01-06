@@ -93,6 +93,22 @@ Agent Scan → API Ingestion → Risk Analysis → Dashboard Visualization
 - 🔗 SIEM integrations
 - 🛡️ CIS Benchmark support
 
+## 📝 Recent Changes
+
+- 2026-01-06 — <feat>[export]: Enhanced PDF generation with ReportLab and improved import handling (07ecc7b)
+- 2026-01-06 — <feat>[SettingPage.tsx]: Added toggle for synthetic data (fa44acc)
+- 2026-01-06 — <feat>[serializers.py]: Add `ErrorBoundary` component for safer rendering and user-friendly error messages (a17145d)
+- 2026-01-06 — <feat>[reports]: Implemented a local fallback for report generation when Celery is unavailable (c97b507)
+- 2026-01-05 — <fix>[components.tsx]: Fixed unused variables and minor typos (39fe683)
+- 2026-01-02 — Add pre-commit configuration, secrets management policy, and error-handling tests (3e97764)
+- 2025-12-30 — Observability: Added OTEL collector and Prometheus integration for telemetry (7c06641, 2f498e1)
+
+## 🟦 Project Status
+
+- **Phase:** Phase 1 — core functionality is implemented and the project is in active development and stabilization.
+- **Current focus:** Stabilizing report generation, improving observability and telemetry, expanding export options (PDF/CSV), and hardening error handling and CI workflows.
+- **Next milestones:** Scheduled scans, advanced reporting/export workflows, SIEM integration, and CIS benchmark support.
+
 ---
 
 ## 🚀 Quick Start
