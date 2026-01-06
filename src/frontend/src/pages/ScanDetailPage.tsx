@@ -111,11 +111,19 @@ export default function ScanDetailPage() {
   const { scanId } = useParams<{ scanId: string }>()
   const [expandedFindingId, setExpandedFindingId] = useState<string | null>(null)
 
-  const { data: scan, isLoading } = useQuery<Scan>({
+  const { data: scan, isLoading, error } = useQuery<Scan>({
     queryKey: ['scan', scanId],
     queryFn: () => scansApi.getById(scanId!),
     enabled: !!scanId,
   })
+
+  // All hooks must be called before any conditional returns
+  const findings = scan?.findings ?? []
+  const guidanceByFindingId = useMemo(() => {
+    const map = new Map<string, FindingGuidance>()
+    findings.forEach((f) => map.set(f.id, buildFindingGuidance(f)))
+    return map
+  }, [findings])
 
   if (isLoading) {
     return (
@@ -130,6 +138,11 @@ export default function ScanDetailPage() {
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
         <h2 className="text-lg font-semibold">Scan not found</h2>
+        {error ? (
+          <p className="text-sm text-muted-foreground mt-2">
+            {error instanceof Error ? error.message : 'Failed to load scan details.'}
+          </p>
+        ) : null}
         <Link to="/systems">
           <Button variant="link">Back to Systems</Button>
         </Link>
@@ -139,13 +152,6 @@ export default function ScanDetailPage() {
 
   const isUrlScan = scan.scan_type === 'url_scan'
   const urlPayload = scan.scan_payload
-  const findings = scan.findings ?? []
-
-  const guidanceByFindingId = useMemo(() => {
-    const map = new Map<string, FindingGuidance>()
-    ;(findings).forEach((f) => map.set(f.id, buildFindingGuidance(f)))
-    return map
-  }, [findings])
 
   return (
     <div className="space-y-6">

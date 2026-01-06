@@ -269,7 +269,7 @@ class ScanSerializer(serializers.ModelSerializer):
     """Full serializer for Scan model."""
 
     findings_count = serializers.SerializerMethodField()
-    findings = FindingListSerializer(many=True, read_only=True)
+    findings = FindingDetailSerializer(many=True, read_only=True)
     system_info = serializers.SerializerMethodField()
 
     class Meta:
@@ -279,6 +279,7 @@ class ScanSerializer(serializers.ModelSerializer):
             "system",
             "system_info",
             "scan_type",
+            "scan_payload",
             "scan_date",
             "status",
             "risk_score",
@@ -298,6 +299,7 @@ class ScanSerializer(serializers.ModelSerializer):
             "status",
             "risk_score",
             "maturity_level",
+            "scan_payload",
             "score_breakdown",
             "error_message",
             "started_at",
