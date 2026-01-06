@@ -431,6 +431,293 @@ export default function ScanDetailPage() {
         </Card>
       )}
 
+      {/* Content Analysis (for URL scans with deep analysis) */}
+      {isUrlScan && urlPayload?.content_analysis && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Deep Content Analysis
+            </CardTitle>
+            <CardDescription>
+              Comprehensive security analysis of website content, scripts, forms, and resources
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Page Overview */}
+              {urlPayload.content_analysis.page_title && (
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2">Page Title</h4>
+                  <p className="font-medium">{urlPayload.content_analysis.page_title}</p>
+                </div>
+              )}
+
+              {/* Content Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted/30 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {urlPayload.content_analysis.scripts?.length || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Scripts</div>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {urlPayload.content_analysis.forms?.length || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Forms</div>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-orange-600">
+                    {urlPayload.content_analysis.third_party_resources?.length || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">3rd Party Resources</div>
+                </div>
+                <div className="p-4 bg-muted/30 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {urlPayload.content_analysis.iframes?.length || 0}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Iframes</div>
+                </div>
+              </div>
+
+              {/* Security Indicators */}
+              <div className="space-y-3">
+                <h4 className="font-medium">Security Indicators</h4>
+                <div className="grid gap-2">
+                  {urlPayload.content_analysis.has_mixed_content && (
+                    <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <span className="text-sm text-red-700 dark:text-red-400">Mixed content detected (HTTP resources on HTTPS page)</span>
+                    </div>
+                  )}
+                  {(urlPayload.content_analysis.has_inline_event_handlers || 0) > 5 && (
+                    <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-700 dark:text-yellow-400">
+                        {urlPayload.content_analysis.has_inline_event_handlers} inline event handlers found
+                      </span>
+                    </div>
+                  )}
+                  {urlPayload.content_analysis.has_document_write && (
+                    <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                      <span className="text-sm text-yellow-700 dark:text-yellow-400">document.write() usage detected</span>
+                    </div>
+                  )}
+                  {urlPayload.content_analysis.has_eval_usage && (
+                    <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <span className="text-sm text-red-700 dark:text-red-400">eval() usage detected (potential XSS risk)</span>
+                    </div>
+                  )}
+                  {!urlPayload.content_analysis.has_mixed_content &&
+                   !urlPayload.content_analysis.has_document_write &&
+                   !urlPayload.content_analysis.has_eval_usage &&
+                   (urlPayload.content_analysis.has_inline_event_handlers || 0) <= 5 && (
+                    <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700 dark:text-green-400">No critical JavaScript security issues detected</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sensitive Data Exposure */}
+              {urlPayload.content_analysis.sensitive_data && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Sensitive Data Exposure</h4>
+                  <div className="grid gap-2">
+                    {(urlPayload.content_analysis.sensitive_data.emails_count || 0) > 10 && (
+                      <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-700 dark:text-yellow-400">
+                          {urlPayload.content_analysis.sensitive_data.emails_count} email addresses found in page source
+                        </span>
+                      </div>
+                    )}
+                    {(urlPayload.content_analysis.sensitive_data.api_keys?.length || 0) > 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-red-700 dark:text-red-400">
+                          {urlPayload.content_analysis.sensitive_data.api_keys.length} API keys/tokens exposed!
+                        </span>
+                      </div>
+                    )}
+                    {urlPayload.content_analysis.sensitive_data.private_keys_found && (
+                      <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                        <span className="text-sm text-red-700 dark:text-red-400 font-medium">
+                          CRITICAL: Private key material found in page source!
+                        </span>
+                      </div>
+                    )}
+                    {(urlPayload.content_analysis.sensitive_data.internal_paths?.length || 0) > 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-700 dark:text-yellow-400">
+                          Internal server paths exposed
+                        </span>
+                      </div>
+                    )}
+                    {(urlPayload.content_analysis.sensitive_data.debug_info?.length || 0) > 0 && (
+                      <div className="flex items-center gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        <span className="text-sm text-yellow-700 dark:text-yellow-400">
+                          Debug/development information found: {urlPayload.content_analysis.sensitive_data.debug_info.join(', ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Third-Party Resources */}
+              {urlPayload.content_analysis.third_party_resources && urlPayload.content_analysis.third_party_resources.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Third-Party Resources ({urlPayload.content_analysis.third_party_resources.length})</h4>
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {urlPayload.content_analysis.third_party_resources.slice(0, 10).map((resource, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-muted/30 rounded text-sm">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {resource.resource_type}
+                          </Badge>
+                          <span className="truncate max-w-[300px]" title={resource.domain}>
+                            {resource.domain}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {resource.is_tracking && (
+                            <Badge className="bg-purple-100 text-purple-700 text-xs">Tracking</Badge>
+                          )}
+                          {resource.has_integrity ? (
+                            <span title="Has SRI">
+                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            </span>
+                          ) : resource.resource_type === 'script' ? (
+                            <span title="No SRI">
+                              <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                    {urlPayload.content_analysis.third_party_resources.length > 10 && (
+                      <div className="text-sm text-muted-foreground text-center py-2">
+                        ... and {urlPayload.content_analysis.third_party_resources.length - 10} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Detected Technologies */}
+              {urlPayload.content_analysis.detected_technologies && urlPayload.content_analysis.detected_technologies.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Detected Technologies</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {urlPayload.content_analysis.detected_technologies.map((tech, idx) => (
+                      <Badge
+                        key={idx}
+                        variant="outline"
+                        className={cn(
+                          tech.confidence === 'confirmed' && 'border-green-500 text-green-700',
+                          tech.confidence === 'high' && 'border-blue-500 text-blue-700',
+                        )}
+                      >
+                        {tech.name}
+                        {tech.confidence === 'confirmed' && ' ✓'}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Forms Analysis */}
+              {urlPayload.content_analysis.forms && urlPayload.content_analysis.forms.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Forms Security ({urlPayload.content_analysis.forms.length} forms)</h4>
+                  <div className="space-y-2">
+                    {urlPayload.content_analysis.forms.map((form, idx) => (
+                      <div key={idx} className="p-3 bg-muted/30 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{form.method}</Badge>
+                            <span className="text-sm truncate max-w-[300px]" title={form.action || ''}>
+                              {form.action ? new URL(form.action).pathname : '/'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {form.has_csrf_token ? (
+                              <Badge className="bg-green-100 text-green-700 text-xs">CSRF ✓</Badge>
+                            ) : form.method === 'POST' ? (
+                              <Badge className="bg-red-100 text-red-700 text-xs">No CSRF</Badge>
+                            ) : null}
+                            {form.password_fields > 0 && (
+                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">
+                                {form.password_fields} Password Field{form.password_fields > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {form.security_issues && form.security_issues.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {form.security_issues.map((issue, i) => (
+                              <div key={i} className="flex items-center gap-2 text-sm text-red-600">
+                                <AlertTriangle className="h-3 w-3" />
+                                {issue}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Links Analysis */}
+              {urlPayload.content_analysis.links && (
+                <div className="space-y-3">
+                  <h4 className="font-medium">Links Analysis</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-3 bg-muted/30 rounded-lg text-center">
+                      <div className="text-xl font-bold">{urlPayload.content_analysis.links.total_links}</div>
+                      <div className="text-xs text-muted-foreground">Total Links</div>
+                    </div>
+                    <div className="p-3 bg-muted/30 rounded-lg text-center">
+                      <div className="text-xl font-bold text-blue-600">{urlPayload.content_analysis.links.internal_links}</div>
+                      <div className="text-xs text-muted-foreground">Internal</div>
+                    </div>
+                    <div className="p-3 bg-muted/30 rounded-lg text-center">
+                      <div className="text-xl font-bold text-orange-600">{urlPayload.content_analysis.links.external_links}</div>
+                      <div className="text-xs text-muted-foreground">External</div>
+                    </div>
+                    <div className="p-3 bg-muted/30 rounded-lg text-center">
+                      <div className={cn("text-xl font-bold", (urlPayload.content_analysis.links.http_links?.length || 0) > 0 ? 'text-red-600' : 'text-green-600')}>
+                        {urlPayload.content_analysis.links.http_links?.length || 0}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Insecure (HTTP)</div>
+                    </div>
+                  </div>
+                  {(urlPayload.content_analysis.links.suspicious_links?.length || 0) > 0 && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                      <div className="font-medium text-red-700 dark:text-red-400 mb-2">Suspicious Links Detected</div>
+                      {urlPayload.content_analysis.links.suspicious_links?.slice(0, 5).map((link, idx) => (
+                        <div key={idx} className="text-sm text-red-600 truncate">
+                          {link.reason}: {link.url}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Score Breakdown */}
       {scan.score_breakdown && Object.keys(scan.score_breakdown).length > 0 && (() => {
         const scoreBreakdown = scan.score_breakdown

@@ -503,13 +503,17 @@ class URLScanView(APIView):
         url = serializer.validated_data["url"]
         environment = serializer.validated_data.get("environment", System.Environment.DEVELOPMENT)
         description = serializer.validated_data.get("description", "")
+        # New option for deep content analysis
+        deep_analysis = serializer.validated_data.get("deep_analysis", True)
 
-        logger.info(f"URL scan requested for: {url}")
+        logger.info(f"URL scan requested for: {url} (deep_analysis={deep_analysis})")
 
         try:
             # Import scanner and analyzer
             from urllib.parse import urlparse
 
+            from .scanners.content_rules import ContentSecurityAnalyzer
+            from .scanners.content_scanner import ContentScanner
             from .scanners.url_scanner import URLScanner
             from .url_rules import URLSecurityAnalyzer
 
@@ -546,68 +550,143 @@ class URLScanView(APIView):
                 started_at=timezone.now(),
             )
 
-            # Perform the URL scan
+            # Perform the URL scan (headers, SSL, etc.)
             scanner = URLScanner(timeout=30, verify_ssl=True)
             scan_result = scanner.scan(url)
 
-            # Store scan payload
-            scan.scan_payload = scan_result.to_dict()
+            # Analyze URL scan results
+            url_analyzer = URLSecurityAnalyzer()
+            url_analysis = url_analyzer.analyze(scan_result.to_dict())
 
-            # Analyze results
-            analyzer = URLSecurityAnalyzer()
-            analysis_result = analyzer.analyze(scan_result.to_dict())
+            # Initialize combined results
+            all_findings = url_analysis["findings"].copy()
+            combined_score_breakdown = url_analysis["score_breakdown"].copy()
+            content_analysis_data = None
+
+            # Perform deep content analysis if enabled
+            if deep_analysis:
+                try:
+                    content_scanner = ContentScanner(timeout=30)
+                    content_result = content_scanner.scan(url)
+                    content_analysis_data = content_result.to_dict()
+
+                    # Analyze content for security issues
+                    content_analyzer = ContentSecurityAnalyzer()
+                    content_analysis = content_analyzer.analyze(content_analysis_data)
+
+                    # Merge findings
+                    all_findings.extend(content_analysis["findings"])
+
+                    # Merge score breakdowns
+                    for severity, count in content_analysis["score_breakdown"].items():
+                        combined_score_breakdown[severity] = combined_score_breakdown.get(severity, 0) + count
+
+                    logger.info(
+                        f"Content analysis completed for {url}: "
+                        f"content_findings={len(content_analysis['findings'])}"
+                    )
+                except Exception as content_err:
+                    logger.warning(f"Content analysis failed for {url}: {content_err}")
+                    # Continue with URL-only analysis
+
+            # Calculate combined risk score
+            severity_weights = {"critical": 25, "high": 15, "medium": 8, "low": 3}
+            combined_risk_score = min(
+                100, sum(count * severity_weights.get(sev, 0) for sev, count in combined_score_breakdown.items())
+            )
+
+            # Determine maturity level
+            maturity_thresholds = {"optimized": 20, "managed": 40, "basic": 60, "reactive": 100}
+            combined_maturity = "reactive"
+            for level, threshold in maturity_thresholds.items():
+                if combined_risk_score <= threshold:
+                    combined_maturity = level
+                    break
+
+            # Build comprehensive scan payload
+            scan_payload = scan_result.to_dict()
+            if content_analysis_data:
+                scan_payload["content_analysis"] = content_analysis_data
+
+            # Store scan payload
+            scan.scan_payload = scan_payload
 
             # Create findings and recommendations
-            findings_created = self._create_findings(scan, analysis_result["findings"])
+            findings_created = self._create_findings(scan, all_findings)
 
             # Update scan with results
-            scan.risk_score = analysis_result["risk_score"]
-            scan.maturity_level = analysis_result["maturity_level"]
-            scan.score_breakdown = analysis_result["score_breakdown"]
+            scan.risk_score = combined_risk_score
+            scan.maturity_level = combined_maturity
+            scan.score_breakdown = combined_score_breakdown
             scan.status = Scan.Status.COMPLETED
             scan.completed_at = timezone.now()
             scan.save()
 
             # Update system with latest scan data
-            system.latest_risk_score = analysis_result["risk_score"]
-            system.latest_maturity_level = analysis_result["maturity_level"]
+            system.latest_risk_score = combined_risk_score
+            system.latest_maturity_level = combined_maturity
             system.last_seen = timezone.now()
             system.save()
 
             logger.info(
-                "URL scan completed for %s: risk_score=%s, findings=%s",
+                "URL scan completed for %s: risk_score=%s, findings=%s (url=%s, content=%s)",
                 url,
-                analysis_result["risk_score"],
+                combined_risk_score,
                 len(findings_created),
+                len(url_analysis["findings"]),
+                len(all_findings) - len(url_analysis["findings"]),
             )
 
-            return Response(
-                {
-                    "scan_id": str(scan.id),
-                    "system_id": str(system.id),
-                    "url": url,
-                    "status": "completed",
-                    "risk_score": analysis_result["risk_score"],
-                    "maturity_level": analysis_result["maturity_level"],
-                    "findings_count": len(findings_created),
-                    "score_breakdown": analysis_result["score_breakdown"],
-                    "scan_details": {
-                        "final_url": scan_result.final_url,
-                        "status_code": scan_result.status_code,
-                        "response_time_ms": scan_result.response_time_ms,
-                        "ssl_valid": scan_result.ssl_info.is_valid if scan_result.ssl_info else None,
-                        "ssl_days_until_expiry": scan_result.ssl_info.days_until_expiry
-                        if scan_result.ssl_info
-                        else None,
-                        "missing_headers": scan_result.security_headers.missing_headers
-                        if scan_result.security_headers
-                        else [],
-                        "redirects": scan_result.redirects,
-                        "errors": scan_result.errors,
-                    },
+            # Build response with comprehensive details
+            response_data = {
+                "scan_id": str(scan.id),
+                "system_id": str(system.id),
+                "url": url,
+                "status": "completed",
+                "risk_score": combined_risk_score,
+                "maturity_level": combined_maturity,
+                "findings_count": len(findings_created),
+                "score_breakdown": combined_score_breakdown,
+                "scan_details": {
+                    "final_url": scan_result.final_url,
+                    "status_code": scan_result.status_code,
+                    "response_time_ms": scan_result.response_time_ms,
+                    "ssl_valid": scan_result.ssl_info.is_valid if scan_result.ssl_info else None,
+                    "ssl_days_until_expiry": scan_result.ssl_info.days_until_expiry if scan_result.ssl_info else None,
+                    "missing_headers": scan_result.security_headers.missing_headers
+                    if scan_result.security_headers
+                    else [],
+                    "redirects": scan_result.redirects,
+                    "errors": scan_result.errors,
                 },
-                status=status.HTTP_201_CREATED,
-            )
+            }
+
+            # Add content analysis summary if performed
+            if content_analysis_data:
+                response_data["content_analysis"] = {
+                    "performed": True,
+                    "page_title": content_analysis_data.get("page_title"),
+                    "content_length": content_analysis_data.get("content_length"),
+                    "scripts_count": len(content_analysis_data.get("scripts", [])),
+                    "forms_count": len(content_analysis_data.get("forms", [])),
+                    "third_party_resources": len(content_analysis_data.get("third_party_resources", [])),
+                    "detected_technologies": content_analysis_data.get("detected_technologies", []),
+                    "has_mixed_content": content_analysis_data.get("has_mixed_content", False),
+                    "has_inline_event_handlers": content_analysis_data.get("has_inline_event_handlers", 0),
+                    "sensitive_data_exposure": {
+                        "emails_found": content_analysis_data.get("sensitive_data", {}).get("emails_count", 0),
+                        "api_keys_found": len(content_analysis_data.get("sensitive_data", {}).get("api_keys", [])),
+                        "private_keys_found": content_analysis_data.get("sensitive_data", {}).get(
+                            "private_keys_found", False
+                        ),
+                    }
+                    if content_analysis_data.get("sensitive_data")
+                    else None,
+                }
+            else:
+                response_data["content_analysis"] = {"performed": False}
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
             logger.error(f"URL scan failed for {url}: {str(e)}")

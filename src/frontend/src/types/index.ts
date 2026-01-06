@@ -68,6 +68,7 @@ export interface URLScanPayload {
   server_info?: Record<string, string>
   scan_timestamp?: string
   errors?: string[]
+  content_analysis?: ContentAnalysisData
 }
 
 export interface SSLInfo {
@@ -115,7 +116,7 @@ export interface CookieInfo {
 export interface Finding {
   id: string
   scan: string
-  category: 'access_control' | 'configuration' | 'patch_management' | 'network' | 'authentication' | 'encryption' | 'logging' | 'web_security' | 'ssl_tls' | 'http_headers' | 'other'
+  category: 'access_control' | 'configuration' | 'patch_management' | 'network' | 'authentication' | 'encryption' | 'logging' | 'web_security' | 'ssl_tls' | 'http_headers' | 'javascript_security' | 'form_security' | 'sensitive_data' | 'third_party_security' | 'mixed_content' | 'iframe_security' | 'information_disclosure' | 'other'
   severity: 'low' | 'medium' | 'high' | 'critical'
   title: string
   description: string
@@ -208,4 +209,141 @@ export interface URLScanResponse {
     redirects: string[]
     errors: string[]
   }
+  content_analysis?: ContentAnalysisSummary
+}
+
+// Content Analysis Types
+export interface ContentAnalysisSummary {
+  performed: boolean
+  page_title?: string
+  content_length?: number
+  scripts_count?: number
+  forms_count?: number
+  third_party_resources?: number
+  detected_technologies?: DetectedTechnology[]
+  has_mixed_content?: boolean
+  has_inline_event_handlers?: number
+  sensitive_data_exposure?: SensitiveDataExposure
+}
+
+export interface DetectedTechnology {
+  name: string
+  confidence: 'low' | 'medium' | 'high' | 'confirmed'
+  source?: string
+}
+
+export interface SensitiveDataExposure {
+  emails_found: number
+  api_keys_found: number
+  private_keys_found: boolean
+}
+
+export interface ContentAnalysisData {
+  url: string
+  page_title?: string
+  content_length: number
+  content_hash?: string
+  scripts: ScriptInfo[]
+  forms: FormInfo[]
+  links?: LinkInfo
+  meta_tags?: MetaTagInfo
+  sensitive_data?: SensitiveDataDetail
+  third_party_resources: ThirdPartyResource[]
+  iframes: IframeInfo[]
+  detected_technologies: DetectedTechnology[]
+  has_mixed_content: boolean
+  has_inline_event_handlers: number
+  has_document_write: boolean
+  has_eval_usage: boolean
+  scan_timestamp: string
+  scan_duration_ms: number
+  errors: string[]
+}
+
+export interface ScriptInfo {
+  src?: string
+  is_inline: boolean
+  is_external: boolean
+  has_integrity: boolean
+  integrity_value?: string
+  crossorigin?: string
+  content_hash?: string
+  content_preview?: string
+  security_issues: string[]
+  dangerous_patterns: Array<{ pattern: string; description: string }>
+}
+
+export interface FormInfo {
+  action?: string
+  method: string
+  has_csrf_token: boolean
+  has_autocomplete_off: boolean
+  is_https_action: boolean
+  input_fields: Array<{
+    type: string
+    name: string
+    autocomplete?: string
+  }>
+  password_fields: number
+  sensitive_fields: string[]
+  security_issues: string[]
+}
+
+export interface LinkInfo {
+  total_links: number
+  internal_links: number
+  external_links: number
+  http_links: string[]
+  javascript_links: string[]
+  data_links: string[]
+  suspicious_links: Array<{ url: string; reason: string }>
+}
+
+export interface MetaTagInfo {
+  csp_meta?: string
+  robots?: string
+  generator?: string
+  author?: string
+  referrer?: string
+  viewport?: string
+  x_ua_compatible?: string
+  refresh_redirect?: string
+  sensitive_meta: Array<{ name: string; content: string }>
+}
+
+export interface SensitiveDataDetail {
+  emails_count: number
+  emails_sample: string[]
+  phone_numbers_count: number
+  ip_addresses: string[]
+  api_keys: Array<{ type: string; value_preview: string }>
+  tokens: Array<{ type: string; value_preview: string }>
+  passwords_in_source: boolean
+  private_keys_found: boolean
+  internal_paths: string[]
+  comments_with_secrets: Array<{ preview: string }>
+  debug_info: string[]
+}
+
+export interface ThirdPartyResource {
+  domain: string
+  resource_type: 'script' | 'style' | 'image' | 'iframe' | 'font'
+  url: string
+  has_integrity: boolean
+  is_tracking: boolean
+  reputation: 'unknown' | 'trusted' | 'suspicious' | 'malicious'
+}
+
+export interface IframeInfo {
+  src?: string
+  sandbox?: string
+  allow?: string
+  is_external: boolean
+}
+
+export interface URLScanRequest {
+  url: string
+  environment?: 'development' | 'staging' | 'production' | 'testing'
+  description?: string
+  deep_analysis?: boolean
 }

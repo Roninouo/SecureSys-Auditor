@@ -52,6 +52,7 @@ export default function SystemsPage() {
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [websiteEnv, setWebsiteEnv] = useState<'development' | 'staging' | 'production' | 'testing'>('production')
   const [websiteDesc, setWebsiteDesc] = useState('')
+  const [deepAnalysis, setDeepAnalysis] = useState(true)
 
   // Server form state
   const [serverHostname, setServerHostname] = useState('')
@@ -92,7 +93,7 @@ export default function SystemsPage() {
 
   // URL scan mutation
   const urlScanMutation = useMutation({
-    mutationFn: (data: { url: string; environment: string; description: string }) =>
+    mutationFn: (data: { url: string; environment: string; description: string; deep_analysis?: boolean }) =>
       scansApi.scanUrl(data),
     onSuccess: (data: URLScanResponse) => {
       queryClient.invalidateQueries({ queryKey: ['systems'] })
@@ -154,6 +155,7 @@ export default function SystemsPage() {
       url: websiteUrl,
       environment: websiteEnv,
       description: websiteDesc,
+      deep_analysis: deepAnalysis,
     })
   }
 
@@ -454,6 +456,24 @@ export default function SystemsPage() {
               onChange={(e) => setWebsiteDesc(e.target.value)}
               className="mt-1"
             />
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+            <input
+              type="checkbox"
+              id="deep-analysis"
+              checked={deepAnalysis}
+              onChange={(e) => setDeepAnalysis(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <div>
+              <label htmlFor="deep-analysis" className="text-sm font-medium cursor-pointer">
+                Deep Content Analysis
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Analyze HTML content, scripts, forms, and detect sensitive data exposure vulnerabilities
+              </p>
+            </div>
           </div>
 
           {urlScanMutation.isError && (

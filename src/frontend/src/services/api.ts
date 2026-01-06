@@ -264,9 +264,12 @@ export const scansApi = {
     return response.data
   },
 
-  // URL/Website scanning
-  scanUrl: async (data: { url: string; environment?: string; description?: string }) => {
-    const response = await scanningApi.post('/scans/url/', data)
+  // URL/Website scanning with deep content analysis
+  scanUrl: async (data: { url: string; environment?: string; description?: string; deep_analysis?: boolean }) => {
+    const response = await scanningApi.post('/scans/url/', {
+      ...data,
+      deep_analysis: data.deep_analysis ?? true, // Enable deep analysis by default
+    })
     return response.data
   },
 }

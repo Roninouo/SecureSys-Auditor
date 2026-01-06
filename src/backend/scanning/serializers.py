@@ -401,11 +401,14 @@ class DashboardStatsSerializer(serializers.Serializer):
 
 
 class URLScanSubmitSerializer(serializers.Serializer):
-    """Serializer for submitting a URL scan."""
+    """Serializer for submitting a URL scan with comprehensive content analysis."""
 
     url = serializers.URLField(max_length=500)
     environment = serializers.ChoiceField(choices=System.Environment.choices, default=System.Environment.DEVELOPMENT)
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    deep_analysis = serializers.BooleanField(
+        default=True, help_text="Enable deep content analysis including JavaScript, forms, and sensitive data detection"
+    )
 
     def validate_url(self, value):
         """Validate and normalize URL."""
@@ -423,7 +426,7 @@ class URLScanSubmitSerializer(serializers.Serializer):
 
 
 class URLScanResultSerializer(serializers.Serializer):
-    """Serializer for URL scan results."""
+    """Serializer for URL scan results with comprehensive content analysis."""
 
     scan_id = serializers.UUIDField()
     system_id = serializers.UUIDField()
@@ -433,3 +436,4 @@ class URLScanResultSerializer(serializers.Serializer):
     maturity_level = serializers.CharField(allow_null=True)
     findings_count = serializers.IntegerField()
     scan_details = serializers.DictField(allow_null=True)
+    content_analysis = serializers.DictField(allow_null=True, required=False)
