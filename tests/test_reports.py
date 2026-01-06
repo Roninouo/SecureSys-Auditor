@@ -6,9 +6,11 @@ Exit criteria:
 """
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
+from rest_framework.test import force_authenticate
+
+from django.urls import resolve
 
 # Check WeasyPrint availability once
 try:
@@ -179,6 +181,13 @@ class TestReportService:
 class TestReportEndpoint:
     """Test report API endpoint."""
 
+    def test_reports_generate_url_routes_to_modular_app(self):
+        """Regression test: /api/v1/reports/* must not be shadowed by legacy core routes."""
+        match = resolve("/api/v1/reports/generate/")
+        from reports.views import ReportGenerationView as ModularReportGenerationView
+
+        assert getattr(match.func, "view_class", None) is ModularReportGenerationView
+
     def test_report_type_validation(self, db):
         """Test endpoint validates report type."""
         from reports.services import ReportType
@@ -218,3 +227,33 @@ class TestReportEndpoint:
         # Should return PDF file
         assert response.status_code == 200
         assert "application/pdf" in response.get("Content-Type", "")
+
+    def test_async_report_generation_starts(self, processed_scan, rf):
+        """Async generation should return a task_id for completed scans."""
+        from unittest.mock import MagicMock, patch
+
+        from reports.views import ReportGenerationView
+
+        from core.models import User
+
+        user = User.objects.create_user(email="admin2@test.com", password="testpass", role=User.Role.ADMIN)
+        request = rf.post(
+            "/api/v1/reports/generate/",
+            {
+                "scan_id": str(processed_scan.id),
+                "report_type": "executive",
+                "async": True,
+                "company_name": "Test Corp",
+            },
+            content_type="application/json",
+        )
+        force_authenticate(request, user=user)
+
+        with patch("reports.views.generate_pdf_report_task.delay") as delay:
+            delay.return_value = MagicMock(id="test-task-id")
+            response = ReportGenerationView.as_view()(request)
+
+        assert response.status_code == 202
+        assert response.data["scan_id"] == str(processed_scan.id)
+        assert response.data["report_type"] == "executive"
+        assert "task_id" in response.data

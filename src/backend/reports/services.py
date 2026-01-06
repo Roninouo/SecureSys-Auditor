@@ -91,9 +91,9 @@ class ReportService:
             ValueError: If scan not found or not completed
             RuntimeError: If WeasyPrint not available
         """
-        from .generator import PDF_GENERATION_AVAILABLE, PDFReportGenerator
+        from .generator import PDFReportGenerator, is_pdf_generation_available
 
-        if not PDF_GENERATION_AVAILABLE:
+        if not is_pdf_generation_available():
             raise RuntimeError("No PDF generation engine available")
 
         # Import here to avoid circular dependency

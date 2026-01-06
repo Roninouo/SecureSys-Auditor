@@ -12,29 +12,73 @@ from django.template.loader import render_to_string
 
 logger = logging.getLogger(__name__)
 
-# Try to import WeasyPrint (requires GTK libraries on some platforms)
+# We keep engine availability as module-level flags, but refresh them lazily at runtime.
+# This prevents stale availability when packages are installed after the Django process starts
+# (common during local development on Windows).
 WEASYPRINT_AVAILABLE = False
-try:
-    from weasyprint import CSS, HTML
-    from weasyprint.text.fonts import FontConfiguration
-
-    WEASYPRINT_AVAILABLE = True
-except (ImportError, OSError) as e:
-    logger.warning(f"WeasyPrint not available. PDF generation will be disabled. Error: {e}")
-
-# Try to import ReportLab (pure-Python wheels on most platforms)
 REPORTLAB_AVAILABLE = False
-try:
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-    REPORTLAB_AVAILABLE = True
-except ImportError as e:
-    logger.warning(f"ReportLab not available. Fallback PDF generation disabled. Error: {e}")
+# Placeholders for optional imports; populated by _try_import_* helpers.
+CSS = HTML = FontConfiguration = None
+colors = A4 = getSampleStyleSheet = Paragraph = SimpleDocTemplate = Spacer = Table = TableStyle = None
 
-PDF_GENERATION_AVAILABLE = WEASYPRINT_AVAILABLE or REPORTLAB_AVAILABLE
+
+def _try_import_weasyprint() -> bool:
+    global WEASYPRINT_AVAILABLE, CSS, HTML, FontConfiguration
+    if WEASYPRINT_AVAILABLE:
+        return True
+    try:
+        from weasyprint import CSS as _CSS
+        from weasyprint import HTML as _HTML
+        from weasyprint.text.fonts import FontConfiguration as _FontConfiguration
+
+        CSS, HTML, FontConfiguration = _CSS, _HTML, _FontConfiguration
+        WEASYPRINT_AVAILABLE = True
+        return True
+    except (ImportError, OSError) as e:
+        logger.warning(f"WeasyPrint not available. PDF generation will be disabled. Error: {e}")
+        return False
+
+
+def _try_import_reportlab() -> bool:
+    global REPORTLAB_AVAILABLE, colors, A4, getSampleStyleSheet, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    if REPORTLAB_AVAILABLE:
+        return True
+    try:
+        from reportlab.lib import colors as _colors
+        from reportlab.lib.pagesizes import A4 as _A4
+        from reportlab.lib.styles import getSampleStyleSheet as _getSampleStyleSheet
+        from reportlab.platypus import Paragraph as _Paragraph
+        from reportlab.platypus import SimpleDocTemplate as _SimpleDocTemplate
+        from reportlab.platypus import Spacer as _Spacer
+        from reportlab.platypus import Table as _Table
+        from reportlab.platypus import TableStyle as _TableStyle
+
+        colors = _colors
+        A4 = _A4
+        getSampleStyleSheet = _getSampleStyleSheet
+        Paragraph = _Paragraph
+        SimpleDocTemplate = _SimpleDocTemplate
+        Spacer = _Spacer
+        Table = _Table
+        TableStyle = _TableStyle
+        REPORTLAB_AVAILABLE = True
+        return True
+    except ImportError as e:
+        logger.warning(f"ReportLab not available. Fallback PDF generation disabled. Error: {e}")
+        return False
+
+
+def is_pdf_generation_available() -> bool:
+    """Return True if any PDF engine is available."""
+    # Try both, allowing either engine to succeed.
+    _try_import_weasyprint()
+    _try_import_reportlab()
+    return WEASYPRINT_AVAILABLE or REPORTLAB_AVAILABLE
+
+
+# Backwards-compatible constant (may be stale in long-running processes; prefer is_pdf_generation_available()).
+PDF_GENERATION_AVAILABLE = is_pdf_generation_available()
 
 
 # NIST CSF Control Mapping
@@ -144,7 +188,7 @@ class PDFReportGenerator:
         # Build context once; shared across engines
         context = self._build_context(scan, report_type, company_name)
 
-        if WEASYPRINT_AVAILABLE:
+        if _try_import_weasyprint():
             # Render HTML
             template_name = f"reports/{report_type}_report.html"
             try:
@@ -162,7 +206,7 @@ class PDFReportGenerator:
             html.write_pdf(pdf_buffer, stylesheets=[css], font_config=font_config)
             return pdf_buffer.getvalue()
 
-        if REPORTLAB_AVAILABLE:
+        if _try_import_reportlab():
             return self._generate_with_reportlab(context=context, report_type=report_type)
 
         raise RuntimeError("No PDF engine available (WeasyPrint/ReportLab)")
