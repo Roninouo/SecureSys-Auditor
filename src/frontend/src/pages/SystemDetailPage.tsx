@@ -82,8 +82,8 @@ export default function SystemDetailPage() {
       setIsRunScanModalOpen(false)
       addToast({
         type: 'success',
-        title: 'Escaneo iniciado',
-        message: 'El escaneo de seguridad ha comenzado'
+        title: 'Scan started',
+        message: 'Security scan has started'
       })
       navigate(`/scans/${data.scan_id}`)
     },
@@ -91,7 +91,7 @@ export default function SystemDetailPage() {
       addToast({
         type: 'error',
         title: 'Error',
-        message: error.message || 'No se pudo iniciar el escaneo'
+        message: error.message || 'Could not start the scan'
       })
     }
   })
@@ -102,8 +102,8 @@ export default function SystemDetailPage() {
     onSuccess: () => {
       addToast({
         type: 'success',
-        title: 'Sistema eliminado',
-        message: 'El sistema ha sido eliminado correctamente'
+        title: 'System deleted',
+        message: 'The system has been deleted successfully'
       })
       navigate('/systems')
     },
@@ -111,7 +111,7 @@ export default function SystemDetailPage() {
       addToast({
         type: 'error',
         title: 'Error',
-        message: error.message || 'No se pudo eliminar el sistema'
+        message: error.message || 'Could not delete the system'
       })
     }
   })
@@ -122,8 +122,8 @@ export default function SystemDetailPage() {
     } else {
       addToast({
         type: 'info',
-        title: 'Ejecutar agente',
-        message: 'Para escanear servidores, ejecuta el SecureSys Agent en el servidor'
+        title: 'Run agent',
+        message: 'To scan servers, run the SecureSys Agent on the server'
       })
       setIsRunScanModalOpen(false)
     }
@@ -346,16 +346,15 @@ export default function SystemDetailPage() {
       <Modal
         isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        title="Eliminar Sistema"
+        title="Delete System"
       >
         <div className="space-y-4">
           <p className="text-muted-foreground">
-            ¿Estás seguro de que deseas eliminar <strong>{system.hostname}</strong>?
-            Esta acción no se puede deshacer y se eliminarán todos los escaneos asociados.
+            Are you sure you want to delete <strong>{system.hostname}</strong>? This action cannot be undone and all associated scans will be removed.
           </p>
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)}>
-              Cancelar
+              Cancel
             </Button>
             <Button
               variant="destructive"
@@ -366,12 +365,12 @@ export default function SystemDetailPage() {
               {deleteMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Eliminando...
+                  Deleting...
                 </>
               ) : (
                 <>
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar
+                  Delete
                 </>
               )}
             </Button>
@@ -383,25 +382,25 @@ export default function SystemDetailPage() {
       <Modal
         isOpen={isRunScanModalOpen}
         onClose={() => setIsRunScanModalOpen(false)}
-        title="Ejecutar Nuevo Escaneo"
+        title="Run New Scan"
       >
         <div className="space-y-4">
           {system.system_type === 'website' ? (
             <>
               <p className="text-muted-foreground">
-                Se ejecutará un escaneo de seguridad completo en:
+                A full security scan will be performed on:
               </p>
               <div className="p-3 bg-muted rounded-lg">
                 <code className="text-sm">{system.url}</code>
               </div>
               <p className="text-sm text-muted-foreground">
-                El escaneo analizará headers de seguridad, certificado SSL, cookies y más.
+                The scan will analyze security headers, SSL certificate, cookies and more.
               </p>
             </>
           ) : (
             <>
               <p className="text-muted-foreground">
-                Para escanear servidores, necesitas ejecutar el SecureSys Agent directamente en el servidor.
+                To scan servers, you need to run the SecureSys Agent directly on the server.
               </p>
               <div className="p-3 bg-muted rounded-lg">
                 <code className="text-sm">securesys-agent scan --system-id {system.id}</code>
@@ -413,7 +412,7 @@ export default function SystemDetailPage() {
           )}
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setIsRunScanModalOpen(false)}>
-              Cancelar
+              Cancel
             </Button>
             {system.system_type === 'website' && (
               <Button
@@ -423,12 +422,12 @@ export default function SystemDetailPage() {
                 {urlScanMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Escaneando...
+                    Scanning...
                   </>
                 ) : (
                   <>
                     <Play className="mr-2 h-4 w-4" />
-                    Iniciar Escaneo
+                    Start Scan
                   </>
                 )}
               </Button>

@@ -37,14 +37,14 @@ type FindingGuidance = {
 
 function buildFindingGuidance(finding: Finding): FindingGuidance {
   const severityImpact: Record<Finding['severity'], string> = {
-    critical: 'Impacto muy alto: puede exponer datos sensibles o permitir compromiso del sistema.',
-    high: 'Impacto alto: aumenta significativamente el riesgo de explotación o fuga de información.',
-    medium: 'Impacto medio: debilita controles y facilita ataques en ciertos escenarios.',
-    low: 'Impacto bajo: reduce la postura de seguridad o filtra información no crítica.',
+    critical: 'Very high impact: may expose sensitive data or allow system compromise.',
+    high: 'High impact: significantly increases the risk of exploitation or data leakage.',
+    medium: 'Medium impact: weakens controls and enables attacks in certain scenarios.',
+    low: 'Low impact: reduces security posture or leaks non-critical information.',
   }
 
   const base: FindingGuidance = {
-    explanation: finding.description || 'Se detectó una condición que puede debilitar la seguridad.',
+    explanation: finding.description || 'A condition was detected that may weaken security.',
     impact: severityImpact[finding.severity],
     remediation: [],
     verification: [],
@@ -59,7 +59,7 @@ function buildFindingGuidance(finding: Finding): FindingGuidance {
     const steps = (top.steps || []).filter(Boolean)
     base.remediation = [top.description, ...steps].filter(Boolean)
     if (top.references && top.references.length > 0) {
-      base.verification = ['Revisar referencias provistas y re-ejecutar el escaneo para confirmar la corrección.']
+      base.verification = ['Review provided references and re-run the scan to confirm the fix.']
     }
     return base
   }
@@ -67,43 +67,43 @@ function buildFindingGuidance(finding: Finding): FindingGuidance {
   // Curated guidance for common web findings (matches the screenshot examples).
   if (title.includes('cookie') || category === 'web_security') {
     base.explanation =
-      'Las cookies detectadas no cumplen con atributos recomendados (por ejemplo: Secure, HttpOnly y/o SameSite). Esto incrementa la superficie de ataque (robo de sesión, XSS/CSRF, fuga por transporte inseguro).'
+      'Detected cookies do not meet recommended attributes (e.g., Secure, HttpOnly and/or SameSite). This increases the attack surface (session theft, XSS/CSRF, leakage over insecure transport).'
     base.remediation = [
-      'Marcar cookies de sesión/autenticación con `Secure` (solo por HTTPS).',
-      'Agregar `HttpOnly` para evitar acceso desde JavaScript (mitiga impacto de XSS).',
-      'Definir `SameSite=Lax` (o `Strict` donde sea viable) y usar `SameSite=None` solo si es necesario y siempre con `Secure`.',
-      'Restringir `Domain` y `Path` al mínimo necesario.',
-      'Evitar cookies persistentes para sesión si no es requerido (controlar `Expires/Max-Age`).',
+      'Mark session/auth cookies with `Secure` (HTTPS only).',
+      'Add `HttpOnly` to prevent access from JavaScript (mitigates XSS).',
+      'Set `SameSite=Lax` (or `Strict` where feasible) and use `SameSite=None` only when necessary and always with `Secure`.',
+      'Restrict `Domain` and `Path` to the minimum required.',
+      'Avoid persistent session cookies unless required (control `Expires/Max-Age`).',
     ]
     base.verification = [
-      'Verificar respuestas HTTP y encabezados `Set-Cookie` (en DevTools o con `curl -I`) para confirmar atributos.',
-      'Repetir el escaneo y validar que el finding desaparece.',
+      'Verify HTTP responses and `Set-Cookie` headers (in DevTools or with `curl -I`) to confirm attributes.',
+      'Re-run the scan and verify the finding disappears.',
     ]
     return base
   }
 
   if (title.includes('server information') || title.includes('information disclosure') || category === 'configuration') {
     base.explanation =
-      'El servidor está revelando información de versión/tecnología mediante headers o banners (por ejemplo `Server`, `X-Powered-By`). Esto ayuda a un atacante a perfilar el stack y buscar exploits específicos.'
+      'The server is revealing version/technology information via headers or banners (e.g., `Server`, `X-Powered-By`). This helps an attacker profile the stack and look for specific exploits.'
     base.remediation = [
-      'Deshabilitar/anonimizar headers de identificación (p. ej. remover `Server` y `X-Powered-By`).',
-      'Asegurar que páginas de error no expongan stack traces ni versiones.',
-      'Mantener componentes actualizados (servidor web, framework, runtime) para reducir exposición si se infiere el stack.',
+      'Disable/anonymize identifying headers (e.g., remove `Server` and `X-Powered-By`).',
+      'Ensure error pages do not expose stack traces or versions.',
+      'Keep components up to date (web server, framework, runtime) to reduce exposure if the stack is inferred.',
     ]
     base.verification = [
-      'Ejecutar `curl -I https://tu-dominio` y confirmar que no se exponen headers sensibles.',
-      'Repetir el escaneo y validar la corrección.',
+      'Run `curl -I https://your-domain` and confirm no sensitive headers are exposed.',
+      'Re-run the scan and verify the fix.',
     ]
     return base
   }
 
   // Generic fallback.
   base.remediation = [
-    'Aplicar hardening de configuración según el componente afectado.',
-    'Reducir la exposición de información innecesaria y seguir el principio de mínimo privilegio.',
-    'Re-ejecutar el escaneo para verificar la remediación.',
+    'Apply configuration hardening according to the affected component.',
+    'Reduce exposure of unnecessary information and follow the principle of least privilege.',
+    'Re-run the scan to verify remediation.',
   ]
-  base.verification = ['Revisar evidencia, aplicar cambios y volver a escanear para confirmar.']
+  base.verification = ['Review evidence, apply fixes, and re-scan to confirm.']
   return base
 }
 

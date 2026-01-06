@@ -81,8 +81,8 @@ export default function ScanListPage() {
     await refetch()
     addToast({
       type: 'success',
-      title: 'Actualizado',
-      message: 'Lista de escaneos actualizada'
+      title: 'Updated',
+      message: 'Scan list updated'
     })
   }
 
@@ -90,13 +90,13 @@ export default function ScanListPage() {
     if (!scans || scans.length === 0) {
       addToast({
         type: 'warning',
-        title: 'Sin datos',
-        message: 'No hay escaneos para exportar'
+        title: 'No data',
+        message: 'No scans to export'
       })
       return
     }
 
-    const headers = ['ID', 'Sistema', 'Estado', 'Risk Score', 'Maturity Level', 'Findings', 'Fecha']
+    const headers = ['ID', 'System', 'Status', 'Risk Score', 'Maturity Level', 'Findings', 'Date']
     const rows = scans.map(scan => [
       scan.id,
       scan.system_hostname || 'N/A',
@@ -120,8 +120,8 @@ export default function ScanListPage() {
 
     addToast({
       type: 'success',
-      title: 'Exportado',
-      message: 'Escaneos exportados a CSV'
+      title: 'Exported',
+      message: 'Scans exported to CSV'
     })
   }
 

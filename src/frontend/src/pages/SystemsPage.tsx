@@ -101,8 +101,8 @@ export default function SystemsPage() {
       setWebsiteDesc('')
       addToast({
         type: 'success',
-        title: 'Website añadido',
-        message: 'El escaneo de seguridad ha comenzado'
+        title: 'Website added',
+        message: 'Security scan has started'
       })
       // Navigate to scan results
       navigate(`/scans/${data.scan_id}`)
@@ -111,7 +111,7 @@ export default function SystemsPage() {
       addToast({
         type: 'error',
         title: 'Error',
-        message: error.message || 'No se pudo escanear el website'
+        message: error.message || 'Could not scan the website'
       })
     }
   })
@@ -134,8 +134,8 @@ export default function SystemsPage() {
       setServerIP('')
       addToast({
         type: 'success',
-        title: 'Servidor añadido',
-        message: `${data.hostname} ha sido registrado exitosamente`
+        title: 'Server added',
+        message: `${data.hostname} has been registered successfully`
       })
       navigate(`/systems/${data.id}`)
     },
@@ -143,7 +143,7 @@ export default function SystemsPage() {
       addToast({
         type: 'error',
         title: 'Error',
-        message: error.message || 'No se pudo registrar el servidor'
+        message: error.message || 'Could not register the server'
       })
     }
   })

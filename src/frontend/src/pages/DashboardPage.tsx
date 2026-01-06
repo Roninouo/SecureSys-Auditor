@@ -78,8 +78,8 @@ export default function DashboardPage() {
     navigate('/scans?severity=critical,high')
     addToast({
       type: 'info',
-      title: 'Filtro aplicado',
-      message: 'Mostrando hallazgos críticos y de alta severidad'
+      title: 'Filter applied',
+      message: 'Showing critical and high severity findings'
     })
   }
 
@@ -95,8 +95,8 @@ export default function DashboardPage() {
     navigate('/systems')
     addToast({
       type: 'info',
-      title: 'Selecciona un sistema',
-      message: 'Elige un sistema para iniciar un nuevo escaneo'
+      title: 'Select a system',
+      message: 'Choose a system to start a new scan'
     })
   }
 
@@ -104,8 +104,8 @@ export default function DashboardPage() {
     await refetch()
     addToast({
       type: 'success',
-      title: 'Datos actualizados',
-      message: 'El dashboard se ha actualizado correctamente'
+      title: 'Data updated',
+      message: 'Dashboard updated successfully'
     })
   }
 
