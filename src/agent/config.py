@@ -6,10 +6,13 @@ Supports minimal telemetry mode to filter sensitive data from scans.
 """
 
 import json
+import logging
 import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 # Fields that are filtered out when minimal_telemetry is enabled
 SENSITIVE_FIELDS = [
@@ -71,8 +74,9 @@ def load_config() -> Config:
             with open(config_path, "r") as f:
                 data = json.load(f)
                 return Config(**data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to load config from {config_path}: {e}", exc_info=True)
+            # Proceeding with defaults, but error is visible now
 
     return Config()
 

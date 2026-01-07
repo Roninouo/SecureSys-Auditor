@@ -119,5 +119,6 @@ def _mark_scan_failed_safe(scan_id: str, error_message: str):
 
         scan = Scan.objects.get(id=scan_id)
         scan.mark_failed(error_message)
-    except Exception:
-        pass  # Best effort - don't fail retry because of this
+    except Exception as e:
+        logger.error(f"Failed to safe-mark scan {scan_id} as failed: {e}", exc_info=True)
+        # Best effort cleanup - exception swallowed but logged

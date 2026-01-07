@@ -59,8 +59,8 @@ class AsyncSecureSysClient(BaseAsyncClient):
             if response.status == 200:
                 data = json.loads(response._body)
                 return data
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to query existing system (falling back to register): {e}")
 
         # Register new
         response = await self._request_with_retry(

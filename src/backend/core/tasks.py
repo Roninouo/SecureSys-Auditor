@@ -96,7 +96,7 @@ def process_scan(self, scan_id: str):
             scan = Scan.objects.get(id=scan_id)
             scan.mark_failed(str(e))
         except Scan.DoesNotExist:
-            pass
+            logger.warning(f"Retry cleanup: Scan {scan_id} not found when trying to mark failed")
 
         # Retry the task
         raise self.retry(exc=e, countdown=60)

@@ -210,8 +210,8 @@ class AsyncSecureSysClient:
                     return data[0]
                 elif isinstance(data, dict) and data.get("results"):
                     return data["results"][0]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to query existing system (falling back to register): {e}")
 
         # Register new system
         response = await self._request_with_retry(
