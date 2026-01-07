@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
 
       logout: () => {
         const state = get()
-        
+
         // Clear state first
         set({
           user: null,
@@ -61,7 +61,7 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           authMethod: null,
         })
-        
+
         // If using OIDC, also logout from Keycloak
         if (state.authMethod === 'oidc') {
           oidcService.logout()
@@ -76,7 +76,7 @@ export const useAuthStore = create<AuthState>()(
 
       refreshAccessToken: async () => {
         const state = get()
-        
+
         if (state.authMethod === 'oidc') {
           const tokens = await oidcService.refreshTokens()
           if (tokens) {
@@ -88,7 +88,7 @@ export const useAuthStore = create<AuthState>()(
           }
           return false
         }
-        
+
         // JWT refresh handled by API interceptor
         return true
       },
@@ -98,4 +98,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
-

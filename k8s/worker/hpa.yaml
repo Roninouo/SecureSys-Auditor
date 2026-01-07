@@ -11,10 +11,10 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: securesys-worker
-  
+
   minReplicas: 2
   maxReplicas: 20
-  
+
   metrics:
     # Scale on CPU - workers are CPU-bound during scan processing
     - type: Resource
@@ -23,7 +23,7 @@ spec:
         target:
           type: Utilization
           averageUtilization: 60
-    
+
     # Scale on memory
     - type: Resource
       resource:
@@ -31,7 +31,7 @@ spec:
         target:
           type: Utilization
           averageUtilization: 70
-    
+
     # Custom metric: Celery queue depth (requires Prometheus adapter)
     # Uncomment if you have prometheus-adapter configured
     # - type: External
@@ -44,7 +44,7 @@ spec:
     #     target:
     #       type: Value
     #       value: "10"
-  
+
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 600  # Wait 10 minutes - workers may have long tasks
@@ -52,7 +52,7 @@ spec:
         - type: Pods
           value: 1
           periodSeconds: 120  # Remove 1 pod every 2 minutes max
-    
+
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:

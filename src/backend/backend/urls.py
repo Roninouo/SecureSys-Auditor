@@ -13,30 +13,31 @@ URL Structure:
 - /api/schema/              OpenAPI schema (JSON/YAML)
 - /health/                  Health check endpoints (K8s compatible)
 """
-from django.contrib import admin
-from django.urls import path, include
+from observability.views import MetricsView
+
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
 
 urlpatterns = [
     # Admin
-    path('admin/', admin.site.urls),
-    
+    path("admin/", admin.site.urls),
     # Health checks (outside /api/v1/ for load balancer compatibility)
-    path('health/', include('observability.urls')),
-    
+    path("health/", include("observability.urls")),
+    # Prometheus metrics (backwards-compatible alias)
+    path("api/v1/metrics/prometheus", MetricsView.as_view(), name="metrics-prometheus"),
+    path("api/v1/metrics/prometheus/", MetricsView.as_view(), name="metrics-prometheus-slash"),
     # API Documentation - always available
-    path('api/', include('backend.api_docs')),
-    
-    # API v1 - Core routes (legacy, being refactored)
-    path('api/v1/', include('core.urls')),
-    
+    path("api/", include("backend.api_docs")),
     # API v1 - Scanning app (new decoupled architecture)
-    path('api/v1/scanning/', include('scanning.urls')),
-    
+    path("api/v1/scanning/", include("scanning.urls")),
     # API v1 - Modular apps
-    path('api/v1/reports/', include('reports.urls')),
-    path('api/v1/webhooks/', include('webhooks.urls')),
+    path("api/v1/reports/", include("reports.urls")),
+    path("api/v1/webhooks/", include("webhooks.urls")),
+    # API v1 - Core routes (legacy, being refactored)
+    # Keep this after modular apps to avoid route shadowing
+    path("api/v1/", include("core.urls")),
 ]
 
 if settings.DEBUG:

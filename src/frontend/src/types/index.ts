@@ -11,9 +11,13 @@ export interface User {
   updated_at: string
 }
 
+export type SystemType = 'server' | 'website'
+
 export interface System {
   id: string
+  system_type: SystemType
   hostname: string
+  url?: string
   os: string
   os_version?: string
   environment: 'development' | 'staging' | 'production' | 'testing'
@@ -31,6 +35,7 @@ export interface Scan {
   id: string
   system: string
   system_hostname?: string
+  scan_type?: 'full' | 'quick' | 'compliance' | 'vulnerability' | 'url_scan'
   scan_date: string
   status: 'pending' | 'processing' | 'completed' | 'failed'
   risk_score?: number
@@ -48,12 +53,70 @@ export interface Scan {
   updated_at: string
   findings_count?: number
   findings?: Finding[]
+  scan_payload?: URLScanPayload
+}
+
+export interface URLScanPayload {
+  url: string
+  final_url: string
+  status_code: number
+  response_time_ms: number
+  ssl_info?: SSLInfo
+  security_headers?: SecurityHeaders
+  cookies?: CookieInfo[]
+  redirects?: string[]
+  server_info?: Record<string, string>
+  scan_timestamp?: string
+  errors?: string[]
+  content_analysis?: ContentAnalysisData
+}
+
+export interface SSLInfo {
+  is_valid: boolean
+  issuer: string
+  subject: string
+  not_before?: string
+  not_after?: string
+  days_until_expiry?: number
+  protocol_version?: string
+  cipher_suite?: string
+  key_size?: number
+  is_self_signed?: boolean
+  san_domains?: string[]
+  errors?: string[]
+}
+
+export interface SecurityHeaders {
+  strict_transport_security?: string
+  content_security_policy?: string
+  x_frame_options?: string
+  x_content_type_options?: string
+  x_xss_protection?: string
+  referrer_policy?: string
+  permissions_policy?: string
+  cross_origin_opener_policy?: string
+  cross_origin_resource_policy?: string
+  server?: string
+  x_powered_by?: string
+  missing_headers?: string[]
+  weak_headers?: Array<{ header: string; issue: string }>
+}
+
+export interface CookieInfo {
+  name: string
+  secure: boolean
+  http_only: boolean
+  same_site?: string
+  path?: string
+  domain?: string
+  expires?: string
+  issues?: string[]
 }
 
 export interface Finding {
   id: string
   scan: string
-  category: 'access_control' | 'configuration' | 'patch_management' | 'network' | 'authentication' | 'encryption' | 'logging' | 'other'
+  category: 'access_control' | 'configuration' | 'patch_management' | 'network' | 'authentication' | 'encryption' | 'logging' | 'web_security' | 'ssl_tls' | 'http_headers' | 'javascript_security' | 'form_security' | 'sensitive_data' | 'third_party_security' | 'mixed_content' | 'iframe_security' | 'information_disclosure' | 'other'
   severity: 'low' | 'medium' | 'high' | 'critical'
   title: string
   description: string
@@ -114,4 +177,173 @@ export interface AuditLog {
   resource_type?: string
   resource_id?: string
   metadata?: Record<string, unknown>
+}
+
+export interface URLScanRequest {
+  url: string
+  environment?: 'development' | 'staging' | 'production' | 'testing'
+  description?: string
+}
+
+export interface URLScanResponse {
+  scan_id: string
+  system_id: string
+  url: string
+  status: 'completed' | 'failed'
+  risk_score: number
+  maturity_level: string
+  findings_count: number
+  score_breakdown: {
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
+  scan_details: {
+    final_url: string
+    status_code: number
+    response_time_ms: number
+    ssl_valid?: boolean
+    ssl_days_until_expiry?: number
+    missing_headers: string[]
+    redirects: string[]
+    errors: string[]
+  }
+  content_analysis?: ContentAnalysisSummary
+}
+
+// Content Analysis Types
+export interface ContentAnalysisSummary {
+  performed: boolean
+  page_title?: string
+  content_length?: number
+  scripts_count?: number
+  forms_count?: number
+  third_party_resources?: number
+  detected_technologies?: DetectedTechnology[]
+  has_mixed_content?: boolean
+  has_inline_event_handlers?: number
+  sensitive_data_exposure?: SensitiveDataExposure
+}
+
+export interface DetectedTechnology {
+  name: string
+  confidence: 'low' | 'medium' | 'high' | 'confirmed'
+  source?: string
+}
+
+export interface SensitiveDataExposure {
+  emails_found: number
+  api_keys_found: number
+  private_keys_found: boolean
+}
+
+export interface ContentAnalysisData {
+  url: string
+  page_title?: string
+  content_length: number
+  content_hash?: string
+  scripts: ScriptInfo[]
+  forms: FormInfo[]
+  links?: LinkInfo
+  meta_tags?: MetaTagInfo
+  sensitive_data?: SensitiveDataDetail
+  third_party_resources: ThirdPartyResource[]
+  iframes: IframeInfo[]
+  detected_technologies: DetectedTechnology[]
+  has_mixed_content: boolean
+  has_inline_event_handlers: number
+  has_document_write: boolean
+  has_eval_usage: boolean
+  scan_timestamp: string
+  scan_duration_ms: number
+  errors: string[]
+}
+
+export interface ScriptInfo {
+  src?: string
+  is_inline: boolean
+  is_external: boolean
+  has_integrity: boolean
+  integrity_value?: string
+  crossorigin?: string
+  content_hash?: string
+  content_preview?: string
+  security_issues: string[]
+  dangerous_patterns: Array<{ pattern: string; description: string }>
+}
+
+export interface FormInfo {
+  action?: string
+  method: string
+  has_csrf_token: boolean
+  has_autocomplete_off: boolean
+  is_https_action: boolean
+  input_fields: Array<{
+    type: string
+    name: string
+    autocomplete?: string
+  }>
+  password_fields: number
+  sensitive_fields: string[]
+  security_issues: string[]
+}
+
+export interface LinkInfo {
+  total_links: number
+  internal_links: number
+  external_links: number
+  http_links: string[]
+  javascript_links: string[]
+  data_links: string[]
+  suspicious_links: Array<{ url: string; reason: string }>
+}
+
+export interface MetaTagInfo {
+  csp_meta?: string
+  robots?: string
+  generator?: string
+  author?: string
+  referrer?: string
+  viewport?: string
+  x_ua_compatible?: string
+  refresh_redirect?: string
+  sensitive_meta: Array<{ name: string; content: string }>
+}
+
+export interface SensitiveDataDetail {
+  emails_count: number
+  emails_sample: string[]
+  phone_numbers_count: number
+  ip_addresses: string[]
+  api_keys: Array<{ type: string; value_preview: string }>
+  tokens: Array<{ type: string; value_preview: string }>
+  passwords_in_source: boolean
+  private_keys_found: boolean
+  internal_paths: string[]
+  comments_with_secrets: Array<{ preview: string }>
+  debug_info: string[]
+}
+
+export interface ThirdPartyResource {
+  domain: string
+  resource_type: 'script' | 'style' | 'image' | 'iframe' | 'font'
+  url: string
+  has_integrity: boolean
+  is_tracking: boolean
+  reputation: 'unknown' | 'trusted' | 'suspicious' | 'malicious'
+}
+
+export interface IframeInfo {
+  src?: string
+  sandbox?: string
+  allow?: string
+  is_external: boolean
+}
+
+export interface URLScanRequest {
+  url: string
+  environment?: 'development' | 'staging' | 'production' | 'testing'
+  description?: string
+  deep_analysis?: boolean
 }

@@ -57,5 +57,5 @@
 * Conventional commits + branch strategy = professional Git history
 * Automate as much as possible to reduce human error in deployments
 * Regularly review and update CI/CD pipelines for improvements
-  
+
 ---

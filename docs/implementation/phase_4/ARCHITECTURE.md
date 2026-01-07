@@ -329,7 +329,7 @@ Request processed or rejected
      │          │
      │ 2 successes
      └──────────┘
-     
+
 Circuit returns to CLOSED on success
 Circuit returns to OPEN on failure in HALF_OPEN
 ```

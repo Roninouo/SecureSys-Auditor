@@ -7,4 +7,4 @@ Handles webhook configuration and delivery with:
 - Circuit breaker pattern
 - Dedicated Celery queue
 """
-default_app_config = 'webhooks.apps.WebhooksConfig'
+default_app_config = "webhooks.apps.WebhooksConfig"

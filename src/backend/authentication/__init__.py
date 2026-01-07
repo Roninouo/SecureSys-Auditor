@@ -11,4 +11,4 @@ Design Principles:
 - Dependency Injection for testability
 - Cache abstraction for scalability
 """
-default_app_config = 'authentication.apps.AuthenticationConfig'
+default_app_config = "authentication.apps.AuthenticationConfig"

@@ -11,7 +11,7 @@ alerting:
   alertmanagers:
     - static_configs:
         - targets:
-          - alertmanager:9093
+            - alertmanager:9093
 
 # Load alerting rules
 rule_files:
@@ -43,6 +43,12 @@ scrape_configs:
       - source_labels: [__name__]
         regex: 'target_info|http_.*|django_.*|celery_.*'
         action: keep
+
+  # Django application metrics (direct scrape from the API)
+  - job_name: 'securesys-backend-direct'
+    metrics_path: /api/v1/metrics/prometheus
+    static_configs:
+      - targets: ['backend:8000']
 
   # Redis metrics (if using redis-exporter)
   - job_name: 'redis'

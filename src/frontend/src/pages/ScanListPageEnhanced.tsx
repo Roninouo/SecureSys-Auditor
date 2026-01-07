@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { 
-  Search, 
+import {
+  Search,
   Scan,
   AlertTriangle,
   CheckCircle,
@@ -100,7 +100,7 @@ const exportHeaders: { key: keyof ScanType | ((item: ScanType) => string); label
 function ScanStatusBadge({ status }: { status: ScanType['status'] }) {
   const config = statusConfig[status]
   const Icon = config.icon
-  
+
   return (
     <Badge className={cn('gap-1', config.color)}>
       <Icon className="h-3 w-3" />
@@ -114,7 +114,7 @@ export default function ScanListPage() {
   const [activeFilters, setActiveFilters] = useState<Record<string, string | string[]>>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
-  
+
   const { data: scans, isLoading, error, refetch } = useQuery<ScanType[]>({
     queryKey: ['scans'],
     queryFn: scansApi.getAll,
@@ -124,26 +124,26 @@ export default function ScanListPage() {
   // Filter and search logic
   const filteredScans = useMemo(() => {
     if (!scans) return []
-    
+
     return scans.filter(scan => {
       // Search filter
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         scan.system_hostname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         scan.id.toLowerCase().includes(searchTerm.toLowerCase())
-      
+
       // Status filter
       const matchesStatus = !activeFilters.status || scan.status === activeFilters.status
-      
+
       // Maturity level filter
       const matchesMaturity = !activeFilters.maturity_level || scan.maturity_level === activeFilters.maturity_level
-      
+
       // Risk score range filter
       let matchesRiskScore = true
       if (activeFilters.risk_score_range && scan.risk_score !== undefined) {
         const [min, max] = (activeFilters.risk_score_range as string).split('-').map(Number)
         matchesRiskScore = scan.risk_score >= min && scan.risk_score <= max
       }
-      
+
       return matchesSearch && matchesStatus && matchesMaturity && matchesRiskScore
     })
   }, [scans, searchTerm, activeFilters])
@@ -295,10 +295,10 @@ export default function ScanListPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                       <ScanStatusBadge status={scan.status} />
-                      
+
                       {scan.status === 'completed' && (
                         <div className="text-right">
                           <div className={cn('text-lg font-bold', getRiskScoreColor(scan.risk_score || 0))}>
@@ -307,18 +307,18 @@ export default function ScanListPage() {
                           <div className="text-xs text-muted-foreground">Risk Score</div>
                         </div>
                       )}
-                      
+
                       {scan.maturity_level && (
                         <Badge className={getMaturityLevelColor(scan.maturity_level)}>
                           {scan.maturity_level}
                         </Badge>
                       )}
-                      
+
                       <div className="text-right">
                         <div className="font-semibold">{scan.findings_count || 0}</div>
                         <div className="text-xs text-muted-foreground">Findings</div>
                       </div>
-                      
+
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
                   </div>

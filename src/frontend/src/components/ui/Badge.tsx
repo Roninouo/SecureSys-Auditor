@@ -12,7 +12,7 @@ function Badge({ className, variant = 'default', ...props }: BadgeProps) {
     destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
     outline: "text-foreground",
   }
-  
+
   return (
     <div
       className={cn(

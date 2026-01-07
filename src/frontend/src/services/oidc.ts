@@ -1,6 +1,6 @@
 /**
  * OIDC Authentication Service for Keycloak Integration
- * 
+ *
  * Handles OpenID Connect authentication flows with Keycloak including:
  * - Authorization Code flow with PKCE
  * - Token refresh
@@ -56,25 +56,25 @@ function generateRandomString(length: number): string {
  */
 async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
   const verifier = generateRandomString(64)
-  
+
   // Create SHA-256 hash of verifier
   const encoder = new TextEncoder()
   const data = encoder.encode(verifier)
   const hash = await crypto.subtle.digest('SHA-256', data)
-  
+
   // Base64url encode the hash
   const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '')
-  
+
   return { verifier, challenge }
 }
 
 /**
  * Parse JWT token claims (without verification - verification happens server-side)
  */
-function parseJwt(token: string): Record<string, any> {
+function parseJwt(token: string): Record<string, any> | null {
   try {
     const base64Url = token.split('.')[1]
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
@@ -86,7 +86,9 @@ function parseJwt(token: string): Record<string, any> {
     )
     return JSON.parse(jsonPayload)
   } catch {
-    return {}
+    // Avoid silent auth failures; do not log token contents.
+    console.debug('OIDC: failed to parse JWT payload')
+    return null
   }
 }
 
@@ -262,6 +264,7 @@ export class OIDCService {
       this.storeTokens(newTokens)
       return newTokens
     } catch {
+      console.debug('OIDC: token refresh failed')
       return null
     }
   }
@@ -309,6 +312,10 @@ export class OIDCService {
    */
   private extractUserFromToken(idToken: string): AuthUser {
     const claims = parseJwt(idToken)
+
+    if (!claims || typeof claims !== 'object') {
+      throw new Error('Invalid ID token')
+    }
 
     // Extract role from realm_access or resource_access
     let role: AuthUser['role'] = 'viewer'
@@ -374,7 +381,13 @@ export class OIDCService {
     if (!tokens?.idToken) {
       return null
     }
-    return this.extractUserFromToken(tokens.idToken)
+    try {
+      return this.extractUserFromToken(tokens.idToken)
+    } catch {
+      // Stored tokens are unusable; clear to avoid repeated failures.
+      this.clearTokens()
+      return null
+    }
   }
 }
 

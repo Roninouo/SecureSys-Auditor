@@ -36,7 +36,7 @@ export default function LoginPage() {
 
     try {
       const response = await authApi.login(data.email, data.password)
-      
+
       login(
         {
           id: response.user_id,
@@ -46,7 +46,7 @@ export default function LoginPage() {
         response.access,
         response.refresh
       )
-      
+
       navigate('/dashboard')
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Invalid credentials')
@@ -58,7 +58,7 @@ export default function LoginPage() {
   const handleOIDCLogin = async () => {
     setIsOIDCLoading(true)
     setError('')
-    
+
     try {
       await oidcService.login()
       // Note: This will redirect to Keycloak, so we won't reach here
@@ -89,7 +89,7 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
-            
+
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium">
                 Email

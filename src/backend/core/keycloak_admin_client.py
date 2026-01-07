@@ -9,31 +9,32 @@ import time
 from typing import Any, Dict, Optional
 
 import requests
+
 from django.conf import settings
 
-logger = logging.getLogger('authentication')
+logger = logging.getLogger("authentication")
 
 
 class KeycloakAdminClient:
     """Client for Keycloak Admin API (client_credentials)."""
 
     def __init__(self):
-        self.server_url = getattr(settings, 'KEYCLOAK_SERVER_URL', '')
-        self.realm = getattr(settings, 'KEYCLOAK_REALM', 'master')
-        self.client_id = getattr(settings, 'KEYCLOAK_ADMIN_CLIENT_ID', '')
-        self.client_secret = getattr(settings, 'KEYCLOAK_ADMIN_CLIENT_SECRET', '')
+        self.server_url = getattr(settings, "KEYCLOAK_SERVER_URL", "")
+        self.realm = getattr(settings, "KEYCLOAK_REALM", "master")
+        self.client_id = getattr(settings, "KEYCLOAK_ADMIN_CLIENT_ID", "")
+        self.client_secret = getattr(settings, "KEYCLOAK_ADMIN_CLIENT_SECRET", "")
         self._access_token: Optional[str] = None
         self._access_token_expires_at: Optional[float] = None
 
     def _validate_config(self) -> None:
         if not self.server_url:
-            raise ValueError('KEYCLOAK_SERVER_URL must be configured')
+            raise ValueError("KEYCLOAK_SERVER_URL must be configured")
         if not self.realm:
-            raise ValueError('KEYCLOAK_REALM must be configured')
+            raise ValueError("KEYCLOAK_REALM must be configured")
         if not self.client_id:
-            raise ValueError('KEYCLOAK_ADMIN_CLIENT_ID must be configured')
+            raise ValueError("KEYCLOAK_ADMIN_CLIENT_ID must be configured")
         if not self.client_secret:
-            raise ValueError('KEYCLOAK_ADMIN_CLIENT_SECRET must be configured')
+            raise ValueError("KEYCLOAK_ADMIN_CLIENT_SECRET must be configured")
 
     def _fetch_access_token(self) -> str:
         """Fetch a fresh admin access token from Keycloak."""
@@ -44,22 +45,22 @@ class KeycloakAdminClient:
         response = requests.post(
             token_url,
             data={
-                'grant_type': 'client_credentials',
-                'client_id': self.client_id,
-                'client_secret': self.client_secret,
+                "grant_type": "client_credentials",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
             },
             timeout=10,
         )
         response.raise_for_status()
 
         token_data = response.json()
-        access_token = token_data.get('access_token')
+        access_token = token_data.get("access_token")
         if not access_token:
-            raise ValueError('Keycloak token response missing access_token')
+            raise ValueError("Keycloak token response missing access_token")
 
         # Track expiry with a small safety window to avoid edge-of-expiry 401s.
         now = time.time()
-        expires_in = int(token_data.get('expires_in', 0) or 0)
+        expires_in = int(token_data.get("expires_in", 0) or 0)
         refresh_skew_seconds = 30
         effective_ttl = max(0, expires_in - refresh_skew_seconds)
 
@@ -84,9 +85,9 @@ class KeycloakAdminClient:
         """Authenticated request with one refresh retry on 401."""
         token = self.get_access_token()
 
-        headers = dict(kwargs.pop('headers', {}) or {})
-        headers.setdefault('Authorization', f'Bearer {token}')
-        kwargs['headers'] = headers
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.setdefault("Authorization", f"Bearer {token}")
+        kwargs["headers"] = headers
 
         response = requests.request(method, url, **kwargs)
 
@@ -97,8 +98,8 @@ class KeycloakAdminClient:
 
             token = self.get_access_token()
             headers = dict(headers)
-            headers['Authorization'] = f'Bearer {token}'
-            kwargs['headers'] = headers
+            headers["Authorization"] = f"Bearer {token}"
+            kwargs["headers"] = headers
             response = requests.request(method, url, **kwargs)
 
         return response
@@ -113,16 +114,16 @@ class KeycloakAdminClient:
         url = f"{self.server_url}/admin/realms/{self.realm}/users"
 
         response = self._request(
-            'POST',
+            "POST",
             url,
-            headers={'Content-Type': 'application/json'},
+            headers={"Content-Type": "application/json"},
             json={
-                'email': email,
-                'emailVerified': True,
-                'firstName': first_name,
-                'lastName': last_name,
-                'enabled': enabled,
-                'username': email,
+                "email": email,
+                "emailVerified": True,
+                "firstName": first_name,
+                "lastName": last_name,
+                "enabled": enabled,
+                "username": email,
             },
             timeout=10,
         )
@@ -133,18 +134,15 @@ class KeycloakAdminClient:
 
     def assign_role(self, user_id: str, role_name: str) -> None:
         roles_url = f"{self.server_url}/admin/realms/{self.realm}/roles/{role_name}"
-        response = self._request('GET', roles_url, timeout=10)
+        response = self._request("GET", roles_url, timeout=10)
         response.raise_for_status()
         role_data = response.json()
 
-        assign_url = (
-            f"{self.server_url}/admin/realms/{self.realm}/users/{user_id}"
-            "/role-mappings/realm"
-        )
+        assign_url = f"{self.server_url}/admin/realms/{self.realm}/users/{user_id}" "/role-mappings/realm"
         response = self._request(
-            'POST',
+            "POST",
             assign_url,
-            headers={'Content-Type': 'application/json'},
+            headers={"Content-Type": "application/json"},
             json=[role_data],
             timeout=10,
         )
@@ -156,9 +154,9 @@ class KeycloakAdminClient:
         url = f"{self.server_url}/admin/realms/{self.realm}/users"
 
         response = self._request(
-            'GET',
+            "GET",
             url,
-            params={'email': email, 'exact': 'true'},
+            params={"email": email, "exact": "true"},
             timeout=10,
         )
         response.raise_for_status()

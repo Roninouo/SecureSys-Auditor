@@ -49,7 +49,7 @@ processors:
   resource:
     attributes:
       - key: deployment.environment
-        value: "${ENVIRONMENT:-production}"
+        value: "${env:ENVIRONMENT}"
         action: upsert
       - key: service.namespace
         value: securesys
@@ -93,24 +93,24 @@ exporters:
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
-  
+
   zpages:
     endpoint: 0.0.0.0:55679
 
 service:
   extensions: [health_check, zpages]
-  
+
   pipelines:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, filter, tail_sampling, resource, batch]
       exporters: [otlp/jaeger]
-    
+
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]
       exporters: [prometheus]
-    
+
     logs:
       receivers: [otlp]
       processors: [memory_limiter, resource, batch]

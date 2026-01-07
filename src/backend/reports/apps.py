@@ -6,7 +6,7 @@ from django.apps import AppConfig
 
 class ReportsConfig(AppConfig):
     """Configuration for the reports app."""
-    
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'reports'
-    verbose_name = 'Report Generation'
+
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "reports"
+    verbose_name = "Report Generation"

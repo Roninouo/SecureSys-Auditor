@@ -3,7 +3,8 @@ Signals for the core app.
 """
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import User, System, Scan, AuditLog
+
+from .models import AuditLog, Scan, System, User
 
 
 @receiver(post_save, sender=User)
@@ -13,9 +14,9 @@ def log_user_creation(sender, instance, created, **kwargs):
         AuditLog.objects.create(
             user=instance,
             action=AuditLog.Action.USER_CREATED,
-            resource_type='User',
+            resource_type="User",
             resource_id=instance.id,
-            metadata={'email': instance.email, 'role': instance.role}
+            metadata={"email": instance.email, "role": instance.role},
         )
 
 
@@ -25,13 +26,9 @@ def log_system_creation(sender, instance, created, **kwargs):
     if created:
         AuditLog.objects.create(
             action=AuditLog.Action.CREATE_SYSTEM,
-            resource_type='System',
+            resource_type="System",
             resource_id=instance.id,
-            metadata={
-                'hostname': instance.hostname,
-                'os': instance.os,
-                'environment': instance.environment
-            }
+            metadata={"hostname": instance.hostname, "os": instance.os, "environment": instance.environment},
         )
 
 
@@ -41,10 +38,7 @@ def log_scan_submission(sender, instance, created, **kwargs):
     if created:
         AuditLog.objects.create(
             action=AuditLog.Action.SUBMIT_SCAN,
-            resource_type='Scan',
+            resource_type="Scan",
             resource_id=instance.id,
-            metadata={
-                'system_id': str(instance.system.id),
-                'hostname': instance.system.hostname
-            }
+            metadata={"system_id": str(instance.system.id), "hostname": instance.system.hostname},
         )

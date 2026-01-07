@@ -48,7 +48,7 @@ spec:
                 name: securesys-backend
                 port:
                   number: 8000
-    
+
     # Frontend
     - host: securesys.io
       http:

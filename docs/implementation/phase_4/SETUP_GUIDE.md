@@ -118,7 +118,7 @@ from backend.api_docs import urlpatterns as api_doc_urls
 
 urlpatterns = [
     # ... existing patterns
-    
+
     # API Documentation (Phase 4)
     path('api/', include(api_doc_urls)),
 ]
@@ -247,7 +247,7 @@ print(result)
 
 services:
   # ... existing services
-  
+
   jaeger:
     image: jaegertracing/all-in-one:latest
     ports:
@@ -256,14 +256,14 @@ services:
       - "4318:4318"    # OTLP HTTP
     environment:
       - COLLECTOR_OTLP_ENABLED=true
-  
+
   prometheus:
     image: prom/prometheus:latest
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
-  
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -359,8 +359,8 @@ curl http://localhost:8000/api/schema/ | jq
 
 # 4. Test rate limiting
 # Should return 429 after limit
-for i in {1..150}; do 
-  curl -w "%{http_code}\n" http://localhost:8000/api/scans/ 
+for i in {1..150}; do
+  curl -w "%{http_code}\n" http://localhost:8000/api/scans/
 done
 ```
 
@@ -455,5 +455,5 @@ curl http://localhost:4318/v1/traces
 
 ---
 
-**Setup Version:** 1.0  
+**Setup Version:** 1.0
 **Last Updated:** December 23, 2025

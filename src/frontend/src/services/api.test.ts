@@ -1,6 +1,6 @@
 /**
  * Tests for API token refresh behavior.
- * 
+ *
  * Verifies the frontend correctly handles:
  * - JWT token refresh on 401 responses
  * - Token field names match backend (access/refresh)

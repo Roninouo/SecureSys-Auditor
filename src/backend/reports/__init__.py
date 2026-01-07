@@ -6,4 +6,4 @@ Handles asynchronous PDF report generation with:
 - Dedicated Celery queue for reports
 - Template-based report generation
 """
-default_app_config = 'reports.apps.ReportsConfig'
+default_app_config = "reports.apps.ReportsConfig"

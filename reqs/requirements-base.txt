@@ -28,6 +28,7 @@ pytz>=2023.3
 
 # PDF Generation
 weasyprint>=60.0,<62.0
+reportlab>=4.0,<5.0
 Jinja2>=3.1,<4.0
 
 # OpenTelemetry Observability
@@ -38,6 +39,9 @@ opentelemetry-instrumentation-django>=0.43b0
 opentelemetry-instrumentation-celery>=0.43b0
 opentelemetry-instrumentation-psycopg2>=0.43b0
 opentelemetry-instrumentation-redis>=0.43b0
+
+# Prometheus metrics endpoint support
+prometheus-client>=0.19,<1.0
 
 # HTTP Client (for OIDC, webhooks)
 requests>=2.31,<3.0

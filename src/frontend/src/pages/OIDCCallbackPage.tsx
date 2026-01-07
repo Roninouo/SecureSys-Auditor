@@ -1,6 +1,6 @@
 /**
  * OIDC Callback Page
- * 
+ *
  * Handles the redirect back from Keycloak after authentication.
  * Exchanges the authorization code for tokens and redirects to the dashboard.
  */
@@ -22,11 +22,11 @@ export default function OIDCCallbackPage() {
     const handleCallback = async () => {
       try {
         setStatus('Exchanging authorization code...')
-        
+
         const { user, tokens } = await oidcService.handleCallback(window.location.href)
-        
+
         setStatus('Authentication successful, redirecting...')
-        
+
         // Update auth store
         login(
           {
@@ -37,12 +37,12 @@ export default function OIDCCallbackPage() {
           tokens.accessToken,
           tokens.refreshToken
         )
-        
+
         // Redirect to dashboard
         setTimeout(() => {
           navigate('/dashboard', { replace: true })
         }, 500)
-        
+
       } catch (err: any) {
         console.error('OIDC callback error:', err)
         setError(err.message || 'Authentication failed')
