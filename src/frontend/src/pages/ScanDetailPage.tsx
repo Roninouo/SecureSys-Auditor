@@ -818,13 +818,13 @@ export default function ScanDetailPage() {
                       <div className="px-4 pb-4">
                         <div className="mt-2 rounded-lg bg-muted/40 p-4 space-y-3">
                           <div>
-                            <div className="text-sm font-semibold">Explicación</div>
+                            <div className="text-sm font-semibold">Explanation</div>
                             <div className="text-sm text-muted-foreground">
                               {guidance?.explanation}
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">Impacto</div>
+                            <div className="text-sm font-semibold">Impact</div>
                             <div className="text-sm text-muted-foreground">{guidance?.impact}</div>
                             {(finding.cvss_score !== undefined || finding.cwe_id) && (
                               <div className="text-xs text-muted-foreground mt-1">
@@ -835,7 +835,7 @@ export default function ScanDetailPage() {
                             )}
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">Solución / Estrategia</div>
+                            <div className="text-sm font-semibold">Remediation / Strategy</div>
                             <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
                               {(guidance?.remediation || []).map((step, idx) => (
                                 <li key={idx}>{step}</li>
@@ -843,7 +843,7 @@ export default function ScanDetailPage() {
                             </ul>
                           </div>
                           <div>
-                            <div className="text-sm font-semibold">Verificación</div>
+                            <div className="text-sm font-semibold">Verification</div>
                             <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
                               {(guidance?.verification || []).map((step, idx) => (
                                 <li key={idx}>{step}</li>
@@ -852,7 +852,7 @@ export default function ScanDetailPage() {
                           </div>
                           {hasEvidence && (
                             <div>
-                              <div className="text-sm font-semibold">Evidencia</div>
+                              <div className="text-sm font-semibold">Evidence</div>
                               <pre className="mt-2 text-xs bg-background/60 border rounded p-3 overflow-auto">
                                 {JSON.stringify(evidence, null, 2)}
                               </pre>

@@ -35,6 +35,12 @@ SecureSys-venv/
 # Runtime logs
 src/backend/logs/
 
+# Local SQLite databases (dev)
+# Ignore local dev DB so it isn't committed by accident
+src/backend/dev_db.sqlite3
+*.sqlite3
+*.sqlite
+
 # TLS certs (compose-prod)
 nginx/ssl/*
 !nginx/ssl/README.md
