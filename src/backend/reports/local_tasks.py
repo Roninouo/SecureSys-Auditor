@@ -77,7 +77,18 @@ def enqueue_local_report_generation(
 
                 _create_audit_log(scan_id, result, requested_by_id)
             except Exception:
-                logger.debug("Local report audit log failed", exc_info=True)
+                logger.warning(
+                    "Local report audit log failed (best-effort)",
+                    extra={"task_id": task_id, "scan_id": scan_id},
+                    exc_info=True,
+                )
+
+                try:
+                    from observability.metrics import security_metrics
+
+                    security_metrics.record_internal_error(component="reports", operation="audit_log")
+                except Exception:
+                    logger.debug("Failed to record audit log metric", exc_info=True)
 
             _set(
                 task_id,

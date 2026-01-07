@@ -388,7 +388,7 @@ class URLScanner:
                             }
                         )
                 except (IndexError, ValueError):
-                    pass
+                    logger.debug("Failed to parse HSTS max-age", exc_info=True)
             if "includesubdomains" not in hsts.lower():
                 security_headers.weak_headers.append(
                     {

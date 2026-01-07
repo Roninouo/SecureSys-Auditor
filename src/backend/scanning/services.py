@@ -134,8 +134,26 @@ class ScanProcessingService:
             )
 
         except Exception as e:
+            duration = time.time() - start_time
             scan.mark_failed(str(e))
-            logger.error(f"Scan {scan_id} failed: {e}")
+            logger.error(
+                "Scan processing failed",
+                extra={
+                    "scan_id": scan_id,
+                    "system_id": str(scan.system.id),
+                    "hostname": scan.system.hostname,
+                },
+                exc_info=True,
+            )
+
+            # Best-effort metrics for failed scans
+            try:
+                from observability.metrics import security_metrics
+
+                security_metrics.record_scan(status="failed", duration=duration, environment=scan.system.environment)
+                security_metrics.record_internal_error(component="scanning", operation="process_scan")
+            except Exception:
+                logger.debug("Failed to record scan failure metrics", exc_info=True)
             raise
 
     def _create_findings(self, scan, findings_data: List[Dict[str, Any]]) -> List:

@@ -87,6 +87,13 @@ class SecurityMetrics:
             unit="1",
         )
 
+        # Internal error metrics (handled errors that should still be observable)
+        self.internal_errors_total = meter.create_counter(
+            name="securesys_internal_errors_total",
+            description="Handled internal errors (should be investigated)",
+            unit="1",
+        )
+
         # Risk score distribution
         self.risk_score = meter.create_histogram(
             name="securesys_risk_score",
@@ -168,6 +175,22 @@ class SecurityMetrics:
             {
                 "success": str(success).lower(),
                 "provider": provider,
+            },
+        )
+
+    def record_internal_error(self, component: str, operation: str):
+        """Record a handled internal error.
+
+        Keep labels low-cardinality.
+        """
+        if not self._enabled:
+            return
+
+        self.internal_errors_total.add(
+            1,
+            {
+                "component": component,
+                "operation": operation,
             },
         )
 

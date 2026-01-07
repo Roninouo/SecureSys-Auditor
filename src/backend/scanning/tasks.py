@@ -51,7 +51,19 @@ def process_scan_task(self, scan_id: str):
         raise
 
     except Exception as e:
-        logger.error(f"Scan processing failed: {e}")
+        logger.error(
+            "Scan processing task failed",
+            extra={"scan_id": scan_id, "task_retries": getattr(self.request, "retries", None)},
+            exc_info=True,
+        )
+
+        # Best-effort internal error metric
+        try:
+            from observability.metrics import security_metrics
+
+            security_metrics.record_internal_error(component="scanning", operation="process_scan_task")
+        except Exception:
+            logger.debug("Failed to record task failure metric", exc_info=True)
 
         # Mark scan as failed before retry
         _mark_scan_failed_safe(scan_id, str(e))
@@ -119,6 +131,17 @@ def _mark_scan_failed_safe(scan_id: str, error_message: str):
 
         scan = Scan.objects.get(id=scan_id)
         scan.mark_failed(error_message)
-    except Exception as e:
-        logger.error(f"Failed to safe-mark scan {scan_id} as failed: {e}", exc_info=True)
+    except Exception:
+        logger.error(
+            "Failed to safe-mark scan as failed",
+            extra={"scan_id": scan_id},
+            exc_info=True,
+        )
+
+        try:
+            from observability.metrics import security_metrics
+
+            security_metrics.record_internal_error(component="scanning", operation="mark_scan_failed_safe")
+        except Exception:
+            logger.debug("Failed to record safe-mark failure metric", exc_info=True)
         # Best effort cleanup - exception swallowed but logged

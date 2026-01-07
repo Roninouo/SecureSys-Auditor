@@ -585,8 +585,20 @@ class URLScanView(APIView):
                         f"Content analysis completed for {url}: "
                         f"content_findings={len(content_analysis['findings'])}"
                     )
-                except Exception as content_err:
-                    logger.warning(f"Content analysis failed for {url}: {content_err}")
+                except Exception:
+                    logger.warning(
+                        "Content analysis failed; continuing with URL-only analysis",
+                        extra={"url": url},
+                        exc_info=True,
+                    )
+
+                    # Best-effort internal error metric
+                    try:
+                        from observability.metrics import security_metrics
+
+                        security_metrics.record_internal_error(component="scanning", operation="content_analysis")
+                    except Exception:
+                        logger.debug("Failed to record content analysis metric", exc_info=True)
                     # Continue with URL-only analysis
 
             # Calculate combined risk score
@@ -689,7 +701,18 @@ class URLScanView(APIView):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            logger.error(f"URL scan failed for {url}: {str(e)}")
+            logger.error(
+                "URL scan failed",
+                extra={"url": url},
+                exc_info=True,
+            )
+
+            try:
+                from observability.metrics import security_metrics
+
+                security_metrics.record_internal_error(component="scanning", operation="url_scan")
+            except Exception:
+                logger.debug("Failed to record url_scan metric", exc_info=True)
 
             # If scan was created, mark it as failed
             if "scan" in locals():
