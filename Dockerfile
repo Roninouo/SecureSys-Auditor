@@ -2,7 +2,7 @@
 # Multi-stage build for optimized production image
 
 # Build stage
-FROM python:3.11-slim as builder
+FROM python:3.14-slim as builder
 
 # Allow configuring pip index/timeout for restricted networks
 ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
@@ -32,7 +32,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 
 # Production stage
-FROM python:3.11-slim as production
+FROM python:3.14-slim as production
 
 # Security: Run as non-root user
 RUN groupadd -r securesys && useradd -r -g securesys securesys
